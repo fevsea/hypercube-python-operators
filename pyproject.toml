@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "hypercube-python-operators"
+version = "0.1.0"
+description = "Basic python operators for the hypercube project"
+authors = ["Alejandro Agustin"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pandas = "^2.2.3"
+pytest = "^8.3.4"
+pydantic = "^2.10.4"
+pyarrow = "^18.1.0"
+
+
+[tool.poetry.group.dev.dependencies]
+coverage = "^7.5.2"
+pytest = "^8.2.1"
+ruff = "^0.4.5"
+bandit = "^1.7.8"
+black = "^24"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
