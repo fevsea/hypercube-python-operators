@@ -4,7 +4,10 @@ from enum import StrEnum
 from typing import override
 
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SerializeAsAny
+
+from runtime.operator_definition import JobDefinition
+
 
 # There is a lot of redundancy having to declare a new command on the enum,
 # class mapping, pydantic model and the union type.
@@ -30,7 +33,9 @@ class CommandName(StrEnum):
 
 class Message(BaseModel):
     command: CommandName
-    data: dict = Field(default_factory=dict)  # noqa: intellij bug
+    data: dict | SerializeAsAny[BaseModel] = Field(  # noqa: intellij bug
+        default_factory=dict
+    )
 
 
 class CommunicationBackend(abc.ABC):
@@ -75,10 +80,10 @@ class CommunicationBackend(abc.ABC):
         if response.command != CommandName.ACK:
             raise ValueError(f"Unsuccessful datum commit: {response}")
 
-    def notify_task_completion(self, task):
+    def notify_job_completion(self, job: JobDefinition):
         """Notify the cubelet that a task has finished."""
         response = self._send_message(
-            Message(command=CommandName.TASK_FINISHED, data=task)
+            Message(command=CommandName.TASK_FINISHED, data=job)
         )
         if response.command != CommandName.ACK:
             raise ValueError(f"Unsuccessful task notification: {response}")

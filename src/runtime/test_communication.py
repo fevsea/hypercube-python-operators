@@ -13,6 +13,15 @@ from src.runtime.communication import (
 )
 
 
+def test_model_is_accepted_as_message_data(self):
+    class TestModel(BaseModel):
+        example: str
+
+    message = Message(command=CommandName.ACK, data=TestModel(example="value"))
+    assert message.data.example == "value"
+    assert message.model_dump_json() == '{"command":"ACK","data":{"example":"value"}}'
+
+
 class TestCommunicationBackend:
 
     class ConcreteCommunicationBackend(CommunicationBackend):

@@ -3,9 +3,26 @@ import logging
 from enum import StrEnum
 import re
 from pathlib import Path
+from typing import Any
 
 from pandas import DataFrame
 from pydantic import BaseModel, Field
+
+
+class OperationDefinition(BaseModel):
+    """Defines a single executable operation.
+
+    It only holds the definition, it cannot be executed by itself.
+    """
+
+    # Operator info
+    name: str
+    library: str
+    arguments: dict[str, Any]
+
+
+class JobDefinition(BaseModel):
+    operations: list[OperationDefinition]
 
 
 class OperatorTags(StrEnum):
@@ -120,6 +137,7 @@ class Operator(abc.ABC):
 
     # Metadata about the operator
     meta_name: str = "GenericOperator"
+    meta_description: str = ""
     meta_labels: set[str] = set()
 
     # Describes the specific I/O shape of the Operator.
@@ -155,4 +173,3 @@ class Operator(abc.ABC):
     def get_human_name(self):
         """Return a human-readable name for the operator."""
         return re.sub(r"\W+", " ", self.meta_name)
-
