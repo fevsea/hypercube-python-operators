@@ -9,7 +9,7 @@ from pandas import DataFrame
 from pydantic import BaseModel, Field
 
 
-class OperationDefinition(BaseModel):
+class TaskDefinition(BaseModel):
     """Defines a single executable operation.
 
     It only holds the definition, it cannot be executed by itself.
@@ -22,7 +22,7 @@ class OperationDefinition(BaseModel):
 
 
 class JobDefinition(BaseModel):
-    operations: list[OperationDefinition]
+    operations: list[TaskDefinition]
 
 
 class OperatorTags(StrEnum):

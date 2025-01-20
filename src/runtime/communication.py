@@ -18,14 +18,14 @@ class CommandName(StrEnum):
     """Represents a message sent TO or FROM the cubelet."""
 
     # From runtime to cubelet
-    GET_TASK = "GET_TASK"
-    TASK_FINISHED = "TASK_FINISHED"
+    GET_JOB = "GET_JOB"
+    JOB_FINISHED = "JOB_FINISHED"
     CREATE_DATUM = "CREATE_DATUM"
     COMMIT_DATUM = "COMMIT_DATUM"
 
     # From cubelet to runtime
-    TASK_INFO = "TASK_INFO"
-    DATUM_INFO = "DATUM_INFO"
+    JOB_DEFINITION = "JOB_DEFINITION"
+    DATUM_DEFINITION = "DATUM_DEFINITION"
     ACK = "ACK"
     STOP = "STOP"
     ERROR = "ERROR"
@@ -49,25 +49,26 @@ class CommunicationBackend(abc.ABC):
         """Sends a message to the cubelet and returns the response."""
         pass
 
-    def get_task(self):
-        """Request a new task from the cubelet. It might respond with a task or a shutdown signal.
+    def get_job(self) -> JobDefinition | None:
+        """Request a new job from the cubelet. It might respond with a job or a shutdown signal.
 
         The None return value should be interpreted as a shutdown signal.
         """
 
-        response = self._send_message(Message(command=CommandName.GET_TASK))
+        response = self._send_message(Message(command=CommandName.GET_JOB))
         if response.command == CommandName.STOP:
             return None
-        elif response.command == CommandName.TASK_INFO:
-            return response.data
+        elif response.command == CommandName.JOB_DEFINITION:
+            job = JobDefinition.model_validate(response.data)
+            return job
 
-        raise ValueError(f"Unexpected response from get task: {response}")
+        raise ValueError(f"Unexpected response from get job: {response}")
 
     def create_datum(self):
         """Request the creation of a new empty datum."""
         response = self._send_message(Message(command=CommandName.CREATE_DATUM))
 
-        if response.command == CommandName.DATUM_INFO:
+        if response.command == CommandName.DATUM_DEFINITION:
             return response.data
 
         raise ValueError(f"Unsuccessful datum request: {response}")
@@ -81,12 +82,12 @@ class CommunicationBackend(abc.ABC):
             raise ValueError(f"Unsuccessful datum commit: {response}")
 
     def notify_job_completion(self, job: JobDefinition):
-        """Notify the cubelet that a task has finished."""
+        """Notify the Cubelet that a job has finished."""
         response = self._send_message(
-            Message(command=CommandName.TASK_FINISHED, data=job)
+            Message(command=CommandName.JOB_FINISHED, data=job)
         )
         if response.command != CommandName.ACK:
-            raise ValueError(f"Unsuccessful task notification: {response}")
+            raise ValueError(f"Unsuccessful job notification: {response}")
 
 
 class TerminalCommunicationBackend(CommunicationBackend):

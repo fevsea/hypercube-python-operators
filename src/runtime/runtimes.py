@@ -6,7 +6,9 @@ import asyncio
 
 from pydantic import BaseModel, Field
 
+from runtime.catalog_base import Catalog
 from runtime.communication import CommunicationBackend
+from runtime.operator_definition import JobDefinition
 
 
 class DatumDefinition(BaseModel):
@@ -24,35 +26,36 @@ class TaskDefinition(BaseModel):
     version: str
 
     options: dict = Field(default_factory=dict)  # noqa: intellij bug
-    input_data: list[DatumDefinition] = Field(
+    input_data: list[DatumDefinition] = Field(  # noqa: intellij bug
         default_factory=list
-    )  # noqa: intellij bug
-    output_data: list[DatumDefinition] = Field(
+    )
+    output_data: list[DatumDefinition] = Field(  # noqa: intellij bug
         default_factory=list
-    )  # noqa: intellij bug
+    )
 
     class Config:
         extra = "allow"
 
 
 class Runtime:
-    """Handles the execution of tasks assigned by the cubelet."""
+    """Handles the execution of jobs assigned by the cubelet."""
 
-    def __init__(self, communication_backend: CommunicationBackend):
+    def __init__(self, catalog: Catalog, communication_backend: CommunicationBackend):
+        self.catalog: Catalog = catalog
         self.communication_backend: CommunicationBackend = communication_backend
         self.logger = logging.getLogger("Runtime")
 
     def start(self):
-        """Starts the task execution loop."""
+        """Starts the job execution loop."""
         while True:
-            next_task = self.communication_backend.get_task()
-            if next_task is None:
-                self.logger.info("Shutdown signal received.")
+            next_job = self.communication_backend.get_job()
+            if next_job is None:
+                self.logger.info("No jobs left. Shutting down runtime.")
                 return
 
-            self.run_task(task=next_task)
+            self.run_job(job=next_job)
 
-    def run_task(self, task):
+    def run_job(self, job: JobDefinition):
         pass
 
 

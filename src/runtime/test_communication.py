@@ -36,19 +36,19 @@ class TestCommunicationBackend:
         stop_message = Message(command=CommandName.STOP)
         backend._send_message = Mock(return_value=stop_message)
 
-        assert backend.get_task() is None
+        assert backend.get_job() is None
 
     def test_get_task_returns_task_info(self, backend):
         task_data = {"task_id": 1, "task_name": "test_task"}
-        response_message = Message(command=CommandName.TASK_INFO, data=task_data)
+        response_message = Message(command=CommandName.JOB_DEFINITION, data=task_data)
         backend._send_message = Mock(return_value=response_message)
 
-        result = backend.get_task()
+        result = backend.get_job()
         assert result == task_data
 
     def test_create_datum_returns_datum_info(self, backend):
         datum_data = {"datum_id": 1}
-        response_message = Message(command=CommandName.DATUM_INFO, data=datum_data)
+        response_message = Message(command=CommandName.DATUM_DEFINITION, data=datum_data)
         backend._send_message = Mock(return_value=response_message)
 
         result = backend.create_datum()
@@ -76,7 +76,7 @@ class TestTerminalCommunicationBackend:
         return TerminalCommunicationBackend()
 
     def test_send_message_outputs_to_stdout(self, backend, capsys):
-        test_message = Message(command=CommandName.GET_TASK, data={"key": "value"})
+        test_message = Message(command=CommandName.GET_JOB, data={"key": "value"})
         with patch.object(backend, "get_response", return_value=test_message):
             backend._send_message(test_message)
             captured = capsys.readouterr()
