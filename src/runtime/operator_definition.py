@@ -22,7 +22,7 @@ class TaskDefinition(BaseModel):
 
 
 class JobDefinition(BaseModel):
-    operations: list[TaskDefinition]
+    tasks: list[TaskDefinition]
 
 
 class OperatorTags(StrEnum):

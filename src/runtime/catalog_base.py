@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Type
 
 
-from runtime.operator_definition import Operator
+from runtime.operator_definition import Operator, TaskDefinition
+
 
 class Catalog:
     """Represent a group of algorithms on a single sourcecode.
@@ -21,6 +22,13 @@ class Catalog:
         """Library name (as id)"""
         self.name: str = name
         self.description: str = description
-        self.operators: Dict[str, Type[Operator]] = {op.meta_name: op for op in operators}
+        self.operators: Dict[str, Type[Operator]] = {op.meta_name.lower(): op for op in operators}
 
-    def get_operator(self, operation_definition: OperationDefinition):
+    def get_operator_for_task(self, task: TaskDefinition) -> Type[Operator]:
+        if task.library.lower() != self.name.lower():
+            raise ValueError(
+                f"The task uses an operator from another library '{task.library}'")
+        op_name = task.name.lower()
+        if op_name not in self.operators:
+           raise ValueError(f"The task uses an unknown operator '{task.name}'")
+        return self.operators[op_name.lower()]

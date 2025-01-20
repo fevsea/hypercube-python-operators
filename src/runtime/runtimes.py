@@ -29,9 +29,6 @@ class TaskDefinition(BaseModel):
     input_data: list[DatumDefinition] = Field(  # noqa: intellij bug
         default_factory=list
     )
-    output_data: list[DatumDefinition] = Field(  # noqa: intellij bug
-        default_factory=list
-    )
 
     class Config:
         extra = "allow"
@@ -56,7 +53,20 @@ class Runtime:
             self.run_job(job=next_job)
 
     def run_job(self, job: JobDefinition):
-        pass
+        self.logger.info(f"Running job: {job}")
+        for task in job.tasks:
+            self.run_task(task)
+
+    def run_task(self, task: TaskDefinition):
+        operation = self._build_operation(task)
+        result = operation.run()
+        self.communication_backend.commit_datum(result)
+
+    def _build_operation(self, task: TaskDefinition) -> Operator
+        operator_class = self.catalog.get_operator_for_task(task)
+        options = operator_class.Options.model_validate(task.options)
+
+        return operator_class(input_data=task.input_data, options=options)
 
 
 class Context:
