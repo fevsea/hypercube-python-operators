@@ -8,11 +8,13 @@ from pydantic import BaseModel, Field
 
 from runtime.catalog_base import Catalog
 from runtime.communication import CommunicationBackend
-from runtime.operator_definition import JobDefinition
+from runtime.operator_definition import JobDefinition, Operator
 
 
 class DatumDefinition(BaseModel):
     """Describes a datum that can be used in an Operator."""
+
+
 
     class Config:
         extra = "allow"
@@ -20,6 +22,9 @@ class DatumDefinition(BaseModel):
 
 class TaskDefinition(BaseModel):
     """Describes a task that can be executed by the runtime."""
+
+    class Config:
+        extra = "allow"
 
     library: str
     operator: str
@@ -30,8 +35,7 @@ class TaskDefinition(BaseModel):
         default_factory=list
     )
 
-    class Config:
-        extra = "allow"
+
 
 
 class Runtime:
@@ -62,11 +66,20 @@ class Runtime:
         result = operation.run()
         self.communication_backend.commit_datum(result)
 
-    def _build_operation(self, task: TaskDefinition) -> Operator
+    def _get_datum(self, datum_definiiton: DatumDefinition):
+        """Returns an adequate datum instance for the given definition.
+
+        It will make sure the data is ready to be consumed.
+        """
+        return self.communication_backend.create_datum()
+
+    def _build_operation(self, task: TaskDefinition) -> Operator:
+        """Converts a task definition into an executable operator."""
         operator_class = self.catalog.get_operator_for_task(task)
         options = operator_class.Options.model_validate(task.options)
+        input_data = map(self._get_datum, task.input_data)
 
-        return operator_class(input_data=task.input_data, options=options)
+        return operator_class(input_data=input_data, options=options)
 
 
 class Context:

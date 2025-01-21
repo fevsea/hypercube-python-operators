@@ -60,7 +60,7 @@ class SlotDefinition(BaseModel):
     Two operators can be connected if they have compatible IoSlot objects.
     """
 
-    name: str = Field(default="")
+    name: str
     tags: set[str] = tuple()
 
     required: bool = Field(default=True)
