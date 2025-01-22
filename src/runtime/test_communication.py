@@ -13,7 +13,7 @@ from src.runtime.communication import (
 )
 
 
-def test_model_is_accepted_as_message_data(self):
+def test_model_is_accepted_as_message_data():
     class TestModel(BaseModel):
         example: str
 
@@ -48,7 +48,9 @@ class TestCommunicationBackend:
 
     def test_create_datum_returns_datum_info(self, backend):
         datum_data = {"datum_id": 1}
-        response_message = Message(command=CommandName.DATUM_DEFINITION, data=datum_data)
+        response_message = Message(
+            command=CommandName.DATUM_DEFINITION, data=datum_data
+        )
         backend._send_message = Mock(return_value=response_message)
 
         result = backend.create_datum()

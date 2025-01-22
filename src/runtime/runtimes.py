@@ -3,21 +3,18 @@ import logging
 
 import typing
 import asyncio
+from enum import StrEnum
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 from runtime.catalog_base import Catalog
 from runtime.communication import CommunicationBackend
 from runtime.operator_definition import JobDefinition, Operator
-
-
-class DatumDefinition(BaseModel):
-    """Describes a datum that can be used in an Operator."""
+from runtime.persistance import NilDatum
 
 
 
-    class Config:
-        extra = "allow"
 
 
 class TaskDefinition(BaseModel):
@@ -31,11 +28,9 @@ class TaskDefinition(BaseModel):
     version: str
 
     options: dict = Field(default_factory=dict)  # noqa: intellij bug
-    input_data: list[DatumDefinition] = Field(  # noqa: intellij bug
+    input_data: list[DatumDefinition | None | list[DatumDefinition]] = Field(  # noqa: intellij bug
         default_factory=list
     )
-
-
 
 
 class Runtime:
@@ -66,11 +61,23 @@ class Runtime:
         result = operation.run()
         self.communication_backend.commit_datum(result)
 
-    def _get_datum(self, datum_definiiton: DatumDefinition):
+    def _get_datum(
+        self, datum_definition: DatumDefinition | None | list[DatumDefinition]
+    ):
         """Returns an adequate datum instance for the given definition.
 
         It will make sure the data is ready to be consumed.
         """
+        if datum_definition is None:
+            return NilDatum
+
+        if type(datum_definition) is list:
+            return [self._get_datum(datum) for datum in datum_definition]
+
+        match datum_definition.type:
+            case DatumDefinition.Type.FILE:
+
+
         return self.communication_backend.create_datum()
 
     def _build_operation(self, task: TaskDefinition) -> Operator:
