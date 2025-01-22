@@ -11,10 +11,7 @@ from pydantic import BaseModel, Field
 from runtime.catalog_base import Catalog
 from runtime.communication import CommunicationBackend
 from runtime.operator_definition import JobDefinition, Operator
-from runtime.persistance import NilDatum
-
-
-
+from runtime.persistance import NilDatum, DatumDefinition, FileDatum, FolderDatum, Datum
 
 
 class TaskDefinition(BaseModel):
@@ -40,6 +37,7 @@ class Runtime:
         self.catalog: Catalog = catalog
         self.communication_backend: CommunicationBackend = communication_backend
         self.logger = logging.getLogger("Runtime")
+        self.datum_cache: dict[str, Datum] = dict()
 
     def start(self):
         """Starts the job execution loop."""
@@ -69,22 +67,21 @@ class Runtime:
         It will make sure the data is ready to be consumed.
         """
         if datum_definition is None:
-            return NilDatum
+            return None
 
         if type(datum_definition) is list:
             return [self._get_datum(datum) for datum in datum_definition]
 
-        match datum_definition.type:
-            case DatumDefinition.Type.FILE:
+        if not datum_definition.hash in self.datum_cache:
+            self.datum_cache[datum_definition.hash] = Datum.datum_factory(datum_definition)
 
-
-        return self.communication_backend.create_datum()
+        return self.datum_cache[datum_definition.hash]
 
     def _build_operation(self, task: TaskDefinition) -> Operator:
         """Converts a task definition into an executable operator."""
         operator_class = self.catalog.get_operator_for_task(task)
         options = operator_class.Options.model_validate(task.options)
-        input_data = map(self._get_datum, task.input_data)
+        input_data = [self._get_datum(datum_definition) for datum_definition in task.input_data]
 
         return operator_class(input_data=input_data, options=options)
 
