@@ -6,7 +6,7 @@ from typing import override
 
 from pydantic import BaseModel, Field, SerializeAsAny
 
-from runtime.operator_definition import JobDefinition
+from runtime.component_definition import JobDefinition
 
 
 # There is a lot of redundancy having to declare a new command on the enum,

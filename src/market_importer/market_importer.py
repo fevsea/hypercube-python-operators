@@ -8,9 +8,9 @@ from market_importer.stratergies import (
     MultipleFolderImporter,
     MultipleFilesImporter,
 )
-from runtime.operator_definition import (
-    Operator,
-    OperatorTags,
+from runtime.component_definition import (
+    Component,
+    ComponentTags,
     SlotDefinition,
     IoType,
     SlotData,
@@ -18,15 +18,15 @@ from runtime.operator_definition import (
 )
 
 
-class MarketImporter(Operator):
+class MarketImporter(Component):
 
     meta_name: str = "market_importer"
-    meta_labels: tuple[str] = {OperatorTags.IMPORTER, OperatorTags.TIMESERIES}
+    meta_labels: tuple[str] = {ComponentTags.IMPORTER, ComponentTags.TIMESERIES}
 
     meta_input_slots: tuple[SlotDefinition] = (
         SlotDefinition(
             name="raw",
-            tags={OperatorTags.RAW, OperatorTags.TIMESERIES},
+            tags={ComponentTags.RAW, ComponentTags.TIMESERIES},
             required=True,
             multiple=False,
             type=IoType.FOLDER,
@@ -35,7 +35,7 @@ class MarketImporter(Operator):
     meta_output_slots: tuple[SlotDefinition] = (
         SlotDefinition(
             name="timeseries",
-            tags={OperatorTags.TIMESERIES},
+            tags={ComponentTags.TIMESERIES},
             multiple=True,
             type=IoType.DATAFRAME,
         ),

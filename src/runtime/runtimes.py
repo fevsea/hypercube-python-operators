@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 from runtime.catalog_base import Catalog
 from runtime.communication import CommunicationBackend
-from runtime.operator_definition import JobDefinition, Operator
-from runtime.persistance import NilDatum, DatumDefinition, FileDatum, FolderDatum, Datum
+from runtime.component_definition import JobDefinition, Component
+from runtime.persistance import DatumDefinition, FileDatum, FolderDatum, Datum
 
 
 class TaskDefinition(BaseModel):
@@ -21,13 +21,13 @@ class TaskDefinition(BaseModel):
         extra = "allow"
 
     library: str
-    operator: str
+    component: str
     version: str
 
     options: dict = Field(default_factory=dict)  # noqa: intellij bug
-    input_data: list[DatumDefinition | None | list[DatumDefinition]] = Field(  # noqa: intellij bug
+    input_data: list[DatumDefinition | None | list[DatumDefinition]] = Field(
         default_factory=list
-    )
+    )  # noqa: intellij bug
 
 
 class Runtime:
@@ -55,8 +55,8 @@ class Runtime:
             self.run_task(task)
 
     def run_task(self, task: TaskDefinition):
-        operation = self._build_operation(task)
-        result = operation.run()
+        component = self._build_component(task)
+        result = component.run()
         self.communication_backend.commit_datum(result)
 
     def _get_datum(
@@ -73,21 +73,25 @@ class Runtime:
             return [self._get_datum(datum) for datum in datum_definition]
 
         if not datum_definition.hash in self.datum_cache:
-            self.datum_cache[datum_definition.hash] = Datum.datum_factory(datum_definition)
+            self.datum_cache[datum_definition.hash] = Datum.datum_factory(
+                datum_definition
+            )
 
         return self.datum_cache[datum_definition.hash]
 
-    def _build_operation(self, task: TaskDefinition) -> Operator:
-        """Converts a task definition into an executable operator."""
-        operator_class = self.catalog.get_operator_for_task(task)
-        options = operator_class.Options.model_validate(task.options)
-        input_data = [self._get_datum(datum_definition) for datum_definition in task.input_data]
+    def _build_component(self, task: TaskDefinition) -> Component:
+        """Converts a task definition into an executable component."""
+        component_class = self.catalog.get_component_for_task(task)
+        options = component_class.Options.model_validate(task.options)
+        input_data = [
+            self._get_datum(datum_definition) for datum_definition in task.input_data
+        ]
 
-        return operator_class(input_data=input_data, options=options)
+        return component_class(input_data=input_data, options=options)
 
 
 class Context:
-    """Object passed to Operators that allows them to interact with the runtime.
+    """Object passed to Component that allows them to interact with the runtime.
 
     It is mainly a facade class for the runtime that simplifies the interface while ensuring users don't mess
     with the runtime directly.

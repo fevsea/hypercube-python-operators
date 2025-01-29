@@ -9,6 +9,7 @@ dependencies = [
     "pandas>=2.2.3,<3",
     "pydantic>=2.10.4,<3",
     "pyarrow>=18.1.0,<19",
+    "pyyaml==6.0.2",
 ]
 
 [dependency-groups]
@@ -20,6 +21,9 @@ dev = [
     "black>=24,<25",
     "setuptools>=75.8.0",
 ]
+
+[tool.hatch.build.targets.wheel]
+      packages = ["src"]
 
 [build-system]
 requires = ["hatchling"]

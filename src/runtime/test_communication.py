@@ -28,7 +28,7 @@ class TestCommunicationBackend:
         def _send_message(self, message: Message) -> Message:
             return message
 
-    @pytest.fixture(scope="class")
+    @pytest.fixture(sce="class")
     def backend(self):
         return self.ConcreteCommunicationBackend()
 

@@ -1,6 +1,8 @@
 from enum import StrEnum
 from pathlib import Path
 from typing import BinaryIO, TextIO
+from unittest import case
+
 import pandas as pd
 from pydantic import BaseModel, Field
 import pickle
@@ -10,7 +12,7 @@ import tomllib
 
 
 class DatumDefinition(BaseModel):
-    """Describes a datum that can be used in an Operator."""
+    """Describes a datum that can be used in a Component."""
 
     class Config:
         extra = "allow"
@@ -48,6 +50,8 @@ class Datum:
                 return DataFrameDatum(datum_definition)
             case DatumDefinition.Type.OBJECT:
                 return ObjectDatum(datum_definition)
+            case _:
+                raise ValueError(f"Unknown datum type: {datum_definition.type}")
 
 
 class FolderDatum(Datum):

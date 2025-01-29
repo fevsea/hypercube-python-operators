@@ -17,7 +17,7 @@ class TaskDefinition(BaseModel):
     It only holds the definition, it cannot be executed by itself.
     """
 
-    # Operator info
+    # Component info
     name: str
     library: str
     arguments: dict[str, Any]
@@ -27,7 +27,7 @@ class JobDefinition(BaseModel):
     tasks: list[TaskDefinition]
 
 
-class OperatorTags(StrEnum):
+class ComponentTags(StrEnum):
     """Enum with some common tags.
 
     It's not an exhaustive list, as tags are just arbitrary strings.
@@ -59,7 +59,7 @@ class IoType(StrEnum):
 class SlotDefinition(BaseModel):
     """Describes an input/output slot.
 
-    Two operators can be connected if they have compatible IoSlot objects.
+    Two components can be connected if they have compatible IoSlot objects.
     """
 
     name: str
@@ -72,26 +72,25 @@ class SlotDefinition(BaseModel):
     type: IoType = Field(default=IoType.FOLDER)
 
 
-class Operator(abc.ABC):
-    """Define the interface for an operator."""
+class Component(abc.ABC):
+    """Define the interface for a component."""
 
-    # Metadata about the operator
-    meta_name: str = "GenericOperator"
+    # Metadata about the component
+    meta_name: str = "GenericComponent"
     meta_description: str = ""
     meta_labels: set[str] = set()
 
-    # Describes the specific I/O shape of the Operator.
+    # Describes the specific I/O shape of the Component.
     meta_input_slots: tuple[SlotDefinition, ...] = tuple()
     meta_output_slots: tuple[SlotDefinition, ...] = tuple()
 
     class Options(BaseModel):
-        """An operator can have arbitrary options.
+        """A component can have arbitrary options.
 
         This is ideally a single-level object. By using a Pydantic model, we can define its range.
         """
 
         pass
-
 
     def __init__(self, input_data: tuple[Datum | None | list[Datum]], options: Options):
         # Anz instance is tied to actual data and parameters
@@ -112,5 +111,5 @@ class Operator(abc.ABC):
         pass
 
     def get_human_name(self):
-        """Return a human-readable name for the operator."""
+        """Return a human-readable name for the component."""
         return re.sub(r"\W+", " ", self.meta_name)

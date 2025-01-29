@@ -5,9 +5,9 @@ from runtime.catalog_base import Catalog
 
 
 catalog = Catalog(
-    name="python-operator-catalog",
-    description="Basic operators written in Python",
-    operators=[
+    name="python-component-catalog",
+    description="Basic components written in Python",
+    components=[
         MarketImporter,
     ],
 )
