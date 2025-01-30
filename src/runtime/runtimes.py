@@ -1,17 +1,12 @@
-import abc
 import logging
-
-import typing
-import asyncio
-from enum import StrEnum
-from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 from runtime.catalog_base import Catalog
 from runtime.communication import CommunicationBackend
 from runtime.component_definition import JobDefinition, Component
-from runtime.persistance import DatumDefinition, FileDatum, FolderDatum, Datum
+from runtime.context import Context
+from runtime.persistance import DatumDefinition, Datum
 
 
 class TaskDefinition(BaseModel):
@@ -61,7 +56,7 @@ class Runtime:
 
     def _get_datum(
         self, datum_definition: DatumDefinition | None | list[DatumDefinition]
-    ):
+    ) -> None | Datum | list[Datum]:
         """Returns an adequate datum instance for the given definition.
 
         It will make sure the data is ready to be consumed.
@@ -83,21 +78,12 @@ class Runtime:
         """Converts a task definition into an executable component."""
         component_class = self.catalog.get_component_for_task(task)
         options = component_class.Options.model_validate(task.options)
-        input_data = [
+        input_data = tuple(
             self._get_datum(datum_definition) for datum_definition in task.input_data
-        ]
+        )
+        context = self._build_context_for_class(task)
 
-        return component_class(input_data=input_data, options=options)
+        return component_class(context=context, input_data=input_data, options=options)
 
-
-class Context:
-    """Object passed to Component that allows them to interact with the runtime.
-
-    It is mainly a facade class for the runtime that simplifies the interface while ensuring users don't mess
-    with the runtime directly.
-
-    This API should be very stable, so introducing a layer of indirection will simplify changes.
-    """
-
-    def __init__(self, runtime: Runtime):
-        self._runtime: Runtime = runtime
+    def _build_context_for_class(self, task: TaskDefinition):
+        return Context(self, task)

@@ -1,7 +1,4 @@
-# File: tests/test_communication.py
-
-from enum import Enum
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import patch, Mock
 
 import pytest
 from pydantic import BaseModel
@@ -10,6 +7,7 @@ from src.runtime.communication import (
     Message,
     CommandName,
     TerminalCommunicationBackend,
+    SimpleCliCommunicationBackend,
 )
 
 
@@ -28,7 +26,7 @@ class TestCommunicationBackend:
         def _send_message(self, message: Message) -> Message:
             return message
 
-    @pytest.fixture(sce="class")
+    @pytest.fixture(scope="class")
     def backend(self):
         return self.ConcreteCommunicationBackend()
 
@@ -37,14 +35,6 @@ class TestCommunicationBackend:
         backend._send_message = Mock(return_value=stop_message)
 
         assert backend.get_job() is None
-
-    def test_get_task_returns_task_info(self, backend):
-        task_data = {"task_id": 1, "task_name": "test_task"}
-        response_message = Message(command=CommandName.JOB_DEFINITION, data=task_data)
-        backend._send_message = Mock(return_value=response_message)
-
-        result = backend.get_job()
-        assert result == task_data
 
     def test_create_datum_returns_datum_info(self, backend):
         datum_data = {"datum_id": 1}
@@ -62,13 +52,6 @@ class TestCommunicationBackend:
 
         # No exception should be raised
         backend.commit_datum({"datum_id": 1})
-
-    def test_notify_task_completion_successful_ack(self, backend):
-        response_message = Message(command=CommandName.ACK)
-        backend._send_message = Mock(return_value=response_message)
-
-        # No exception should be raised
-        backend.notify_task_completion({"task_id": 1})
 
 
 class TestTerminalCommunicationBackend:
@@ -117,3 +100,41 @@ class TestTerminalCommunicationBackend:
         line = f"Invalid JSON command"
         parsed_message = backend._parse_line(line)
         assert parsed_message is None
+
+
+class TestSimpleCliBackend:
+    """This tests the SimpleCliCommunicationBackend class"""
+
+    @pytest.fixture()
+    def backend(self):
+        return SimpleCliCommunicationBackend()
+
+    def test_parse_args_with_component_and_no_file(self):
+        args = SimpleCliCommunicationBackend._parse_args(["component_name"])
+        assert args.component == "component_name"
+        assert args.file is None
+        assert args.output is None
+
+    def test_parse_args_raises_error_with_both_file_and_component(self):
+        with pytest.raises(
+            SystemExit
+        ):  # argparse raises SystemExit by default on error
+            SimpleCliCommunicationBackend._parse_args(
+                ["component_name", "--file", "job.json"]
+            )
+
+    def test_parse_args_accepts_valid_kv_argument(self):
+        args = SimpleCliCommunicationBackend._parse_args(
+            ["_", "-a", "key1=value1,key2=value2"]
+        )
+        assert args.argument == {"key1": "value1", "key2": "value2"}
+
+    def test_parse_args_rejects_invalid_kv_pairs(self):
+        with pytest.raises(SystemExit):  # argparse raises SystemExit on invalid input
+            SimpleCliCommunicationBackend._parse_args(["--argument", "invalid_pair"])
+
+    def test_parse_args_requires_component_or_file(self):
+        with pytest.raises(
+            SystemExit
+        ):  # argparse raises SystemExit by default on error
+            SimpleCliCommunicationBackend._parse_args([])

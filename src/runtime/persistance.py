@@ -1,14 +1,13 @@
+import json
+import pickle
+import tomllib
 from enum import StrEnum
 from pathlib import Path
 from typing import BinaryIO, TextIO
-from unittest import case
 
 import pandas as pd
-from pydantic import BaseModel, Field
-import pickle
-import json
 import yaml
-import tomllib
+from pydantic import BaseModel, Field
 
 
 class DatumDefinition(BaseModel):
@@ -22,6 +21,7 @@ class DatumDefinition(BaseModel):
         FOLDER = "folder"
         DATAFRAME = "dataframe"
         OBJECT = "object"
+        EMPTY = "empty"
 
     path: Path
     type: Type = Field(default=Type.FILE)
@@ -50,6 +50,8 @@ class Datum:
                 return DataFrameDatum(datum_definition)
             case DatumDefinition.Type.OBJECT:
                 return ObjectDatum(datum_definition)
+            case DatumDefinition.Type.EMPTY:
+                return EmptyDatum(datum_definition)
             case _:
                 raise ValueError(f"Unknown datum type: {datum_definition.type}")
 
@@ -59,6 +61,19 @@ class FolderDatum(Datum):
 
     def get_path(self) -> Path:
         return self._definition.path
+
+
+class EmptyDatum(Datum):
+    """Represents an empty datum with no data.
+
+    Usually acts as a placeholder to indicate where a real datum should be saved.
+    """
+
+    def promote(self, new_type: DatumDefinition.Type):
+        """Cast to one of the subclasses of Datum."""
+        definition = self._definition.model_copy()
+        definition.type = new_type
+        return Datum.datum_factory(self._definition)
 
 
 class FileDatum(Datum):

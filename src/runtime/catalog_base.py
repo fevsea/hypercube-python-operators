@@ -1,6 +1,4 @@
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import List, Dict, Any, Type
+from typing import Dict, Type, TYPE_CHECKING
 
 
 from runtime.component_definition import Component, TaskDefinition
@@ -23,7 +21,7 @@ class Catalog:
         self.name: str = name
         self.description: str = description
         self.components: Dict[str, Type[Component]] = {
-            component.meta_name.lower(): component for component in components
+            component.name.lower(): component for component in components
         }
 
     def get_component_for_task(self, task: TaskDefinition) -> Type[Component]:

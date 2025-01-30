@@ -2,7 +2,6 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from runtime.enums import is_valid_currency_pair
 from market_importer.stratergies import (
     ImportStrategy,
     MultipleFolderImporter,
@@ -13,9 +12,8 @@ from runtime.component_definition import (
     ComponentTags,
     SlotDefinition,
     IoType,
-    SlotData,
-    FolderSlot,
 )
+from runtime.enums import is_valid_currency_pair
 
 
 class MarketImporter(Component):

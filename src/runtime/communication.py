@@ -2,11 +2,13 @@ import abc
 import sys
 from enum import StrEnum
 from typing import override
-
+import argparse
 
 from pydantic import BaseModel, Field, SerializeAsAny
 
-from runtime.component_definition import JobDefinition
+from runtime.command_line import kv_pairs, parse_kv_pairs
+from runtime.component_definition import JobDefinition, TaskDefinition
+from runtime.persistance import EmptyDatum, DatumDefinition
 
 
 # There is a lot of redundancy having to declare a new command on the enum,
@@ -90,6 +92,97 @@ class CommunicationBackend(abc.ABC):
             raise ValueError(f"Unsuccessful job notification: {response}")
 
 
+class SimpleCliCommunicationBackend(CommunicationBackend):
+    """Gets all the data from the command line arguments.
+
+    It is intended to run a single task. If the runtime tries to do more it will fail.
+    """
+
+    def __init__(self):
+        self.args = self._parse_args(sys.argv[1:])
+        self.job = self._parse_job()
+
+    def _send_message(self, message: Message) -> Message:
+        pass
+
+    @staticmethod
+    def _parse_args(
+        raw_args: list[str],
+    ):
+        """
+
+        Args are passed explicitly for testability
+        """
+        parser = argparse.ArgumentParser(
+            description="Simple Command-line Communication Backend"
+        )
+
+        parser.add_argument(
+            "component", type=str, nargs="?", help="ID of the component you want to run"
+        )
+
+        parser.add_argument(
+            "-f",
+            "--file",
+            type=str,
+            help="File containing the job definition.",
+            required=False,
+        )
+        parser.add_argument("-o", "--output", type=str, help="Optional output path")
+        parser.add_argument("-i", "--input", type=str, help="Optional input datum path")
+
+        parser.add_argument(
+            "-a",
+            "--argument",
+            type=kv_pairs,
+            help="Optional option to pass to the component.. Expects comma-separated key=value pairs.",
+            required=False,
+            action="append",
+        )
+
+        parser.add_argument(
+            "-c",
+            "--context",
+            type=kv_pairs,
+            help="Optional context options. Expects comma-separated key=value pairs.",
+            required=False,
+            action="append",
+        )
+
+        args = parser.parse_args(raw_args)
+        args.argument = parse_kv_pairs(args.argument)
+        args.context = parse_kv_pairs(args.context)
+
+        if args.file is None and args.component is None:
+            parser.error("Either --file or component must be specified")
+        elif args.file is not None and args.component is not None:
+            parser.error("Only one of --file or component can be specified")
+
+        return args
+
+    def _parse_job(self):
+        if self.args.file is not None:
+            return JobDefinition.model_validate_file(self.args.file)
+
+        task = TaskDefinition(
+            name=self.args.component,
+            library="local",
+            arguments=self.args.argument,
+            input_data=[],
+            output_data=[],
+        )
+
+        if self.args.input is not None:
+            # Todo: How to deal with not knowing the type of input
+            datum = EmptyDatum(DatumDefinition(path=self.args.input))
+            task.input_data.append(datum)
+        if self.args.output is not None:
+            datum = EmptyDatum(DatumDefinition(path=self.args.output))
+            task.output_data.append(datum)
+
+        return JobDefinition(tasks=[])
+
+
 class TerminalCommunicationBackend(CommunicationBackend):
     """
     Handles communication with the cubelet thought process StdOut and StdIn.
@@ -108,7 +201,9 @@ class TerminalCommunicationBackend(CommunicationBackend):
         print(f"{self.OUT_SEPARATOR}{payload}")
         return self.get_response()
 
-    def get_response(self) -> Message:
+    def get_response(
+        self,
+    ) -> Message:  # noqa: This method does indeed only return a Message
         """Waits for a response from the cubelet.
 
         If no response is received, we get stuck.

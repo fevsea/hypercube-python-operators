@@ -1,14 +1,12 @@
 import abc
-import logging
-from enum import StrEnum
 import re
-from pathlib import Path
+from enum import StrEnum
 from typing import Any
 
-from pandas import DataFrame
 from pydantic import BaseModel, Field
 
 from runtime.persistance import Datum
+from runtime.context import Context
 
 
 class TaskDefinition(BaseModel):
@@ -19,8 +17,12 @@ class TaskDefinition(BaseModel):
 
     # Component info
     name: str
-    library: str
-    arguments: dict[str, Any]
+    library: str = "local"
+
+    # Parameters
+    arguments: dict[str, Any] = Field(default_factory=list)
+    input_data: list[Datum] = Field(default_factory=list)
+    output_data: list[Datum] = Field(default_factory=list)
 
 
 class JobDefinition(BaseModel):
@@ -62,13 +64,13 @@ class SlotDefinition(BaseModel):
     Two components can be connected if they have compatible IoSlot objects.
     """
 
+    # Meta
     name: str
-    tags: set[str] = tuple()
+    meta_labels: set[str] = set()
 
+    # What kind of data is expected
     required: bool = Field(default=True)
-    # Whether the slot expects a list or a single instance of the declared type
     multiple: bool = Field(default=False)
-    # What is the underlying data format expected.
     type: IoType = Field(default=IoType.FOLDER)
 
 
@@ -76,13 +78,13 @@ class Component(abc.ABC):
     """Define the interface for a component."""
 
     # Metadata about the component
-    meta_name: str = "GenericComponent"
-    meta_description: str = ""
-    meta_labels: set[str] = set()
+    name: str = "GenericComponent"
+    description: str = ""
+    labels: set[str] = set()
 
     # Describes the specific I/O shape of the Component.
-    meta_input_slots: tuple[SlotDefinition, ...] = tuple()
-    meta_output_slots: tuple[SlotDefinition, ...] = tuple()
+    input_slots: tuple[SlotDefinition, ...] = tuple()
+    output_slots: tuple[SlotDefinition, ...] = tuple()
 
     class Options(BaseModel):
         """A component can have arbitrary options.
@@ -92,18 +94,24 @@ class Component(abc.ABC):
 
         pass
 
-    def __init__(self, input_data: tuple[Datum | None | list[Datum]], options: Options):
-        # Anz instance is tied to actual data and parameters
+    def __init__(
+        self,
+        context: Context,
+        input_data: tuple[Datum | None | list[Datum], ...],
+        options: Options,
+    ):
+        # An instance is tied to actual data and parameters
         self.input_data = input_data
         self.options = options
-        self.logger = logging.getLogger(self.meta_name)
+        self.context = context
+        self.logger = context.get_logger(self.name)
 
         # Check we have all required fields
-        if len(self.meta_input_slots) != len(input_data):
+        if len(self.input_slots) != len(input_data):
             raise ValueError(
-                f"The number of input slots ({len(input_data)}) does not match the number of required input slots ({len(self.meta_input_slots)})"
+                f"The number of input slots ({len(input_data)}) does not match the number of required input slots ({len(self.input_slots)})"
             )
-        for slot, data in zip(self.meta_input_slots, input_data):
+        for slot, data in zip(self.input_slots, input_data):
             if slot.required and data is None:
                 raise ValueError(f"Slot {slot.name} is required but not provided.")
 
@@ -112,4 +120,4 @@ class Component(abc.ABC):
 
     def get_human_name(self):
         """Return a human-readable name for the component."""
-        return re.sub(r"\W+", " ", self.meta_name)
+        return re.sub(r"\W+", " ", self.name)

@@ -3,8 +3,8 @@ from typing import Generator
 
 import pandas as pd
 
-from runtime.enums import is_valid_currency_pair
 from runtime.component_definition import DataframeSlot
+from runtime.enums import is_valid_currency_pair
 
 
 def is_forex(literal: str, dictionary: set[str]) -> bool:
