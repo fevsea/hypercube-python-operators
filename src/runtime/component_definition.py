@@ -1,11 +1,11 @@
 import abc
 import re
 from enum import StrEnum
-from typing import Any
+from typing import Any, Callable, Type
 
 from pydantic import BaseModel, Field
 
-from runtime.persistance import Datum
+from runtime.persistance import Datum, DatumDefinition
 from runtime.context import Context
 
 
@@ -21,8 +21,8 @@ class TaskDefinition(BaseModel):
 
     # Parameters
     arguments: dict[str, Any] = Field(default_factory=list)
-    input_data: list[Datum] = Field(default_factory=list)
-    output_data: list[Datum] = Field(default_factory=list)
+    input_data: list[DatumDefinition] = Field(default_factory=list)
+    output_data: list[DatumDefinition] = Field(default_factory=list)
 
 
 class JobDefinition(BaseModel):
@@ -66,7 +66,7 @@ class SlotDefinition(BaseModel):
 
     # Meta
     name: str
-    meta_labels: set[str] = set()
+    labels: set[str] = set()
 
     # What kind of data is expected
     required: bool = Field(default=True)
@@ -98,22 +98,36 @@ class Component(abc.ABC):
         self,
         context: Context,
         input_data: tuple[Datum | None | list[Datum], ...],
+        output_data: tuple[Datum | None | list[Datum], ...],
         options: Options,
     ):
         # An instance is tied to actual data and parameters
-        self.input_data = input_data
+        self.input_data = self._validate_slots(input_data, self.input_slots)
+        self.output_data = self._validate_slots(output_data, self.output_slots)
         self.options = options
         self.context = context
         self.logger = context.get_logger(self.name)
 
-        # Check we have all required fields
-        if len(self.input_slots) != len(input_data):
+    @staticmethod
+    def _validate_slots(
+        datums: tuple[Datum, ...],
+        slots: tuple[SlotDefinition, ...],
+    ):
+        if len(slots) != len(datums):
+            # The zip validation below requires this invariant
             raise ValueError(
-                f"The number of input slots ({len(input_data)}) does not match the number of required input slots ({len(self.input_slots)})"
+                f"The number of input slots ({len(datums)}) does not match the number of required input slots ({len(slots)})"
             )
-        for slot, data in zip(self.input_slots, input_data):
-            if slot.required and data is None:
+
+        for slot, datum in zip(slots, datums):
+            if slot.required and datum is None:
                 raise ValueError(f"Slot {slot.name} is required but not provided.")
+            if slot.type != datum.get_type():
+                raise ValueError(
+                    f"Slot {slot.name} is of type {slot.type} but the provided datum is of type {datum.get_type()}"
+                )
+        # The content of list datum is not validated
+        return datums
 
     def run(self) -> tuple[Datum]:
         pass

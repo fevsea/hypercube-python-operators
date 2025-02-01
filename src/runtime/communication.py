@@ -1,6 +1,7 @@
 import abc
 import sys
 from enum import StrEnum
+from pathlib import Path
 from typing import override
 import argparse
 
@@ -8,7 +9,7 @@ from pydantic import BaseModel, Field, SerializeAsAny
 
 from runtime.command_line import kv_pairs, parse_kv_pairs
 from runtime.component_definition import JobDefinition, TaskDefinition
-from runtime.persistance import EmptyDatum, DatumDefinition
+from runtime.persistance import UnspecifiedDatum, DatumDefinition
 
 
 # There is a lot of redundancy having to declare a new command on the enum,
@@ -101,9 +102,47 @@ class SimpleCliCommunicationBackend(CommunicationBackend):
     def __init__(self):
         self.args = self._parse_args(sys.argv[1:])
         self.job = self._parse_job()
+        self.job_completed = False
 
     def _send_message(self, message: Message) -> Message:
-        pass
+        """Simulate responses based on the job definition.
+
+        Fail if the context tries to do more than what is allowed.
+        """
+        match message.command:
+            case CommandName.GET_JOB:
+                if self.job is not None:
+                    return Message(command=CommandName.JOB_DEFINITION, data=self.job)
+                else:
+                    return Message(command=CommandName.STOP)
+            case CommandName.JOB_FINISHED:
+                if self.job_completed:
+                    return Message(
+                        command=CommandName.ERROR,
+                        data={
+                            "msg": "Job already completed. This communication backend only supports a single job."
+                        },
+                    )
+                else:
+                    self.job_completed = True
+                    return Message(command=CommandName.ACK)
+            case CommandName.CREATE_DATUM:
+                return Message(
+                    command=CommandName.ERROR,
+                    data={
+                        "msg": f"The {self.__class__.__name__} does not support creating datums. Use the --input option to specify a path to an existing datum or the --output option to create a new one."
+                    },
+                )
+            case CommandName.COMMIT_DATUM:
+                # The data should be where the user requested, it's their responsibility to actually commit it.
+                return Message(command=CommandName.ACK)
+            case _:
+                return Message(
+                    command=CommandName.ERROR,
+                    data={
+                        "msg": f"Command unknown or not supported by {self.__class__.__name__}"
+                    },
+                )
 
     @staticmethod
     def _parse_args(
@@ -160,27 +199,27 @@ class SimpleCliCommunicationBackend(CommunicationBackend):
 
         return args
 
+    @staticmethod
+    def _add_datum(datums: list, path: Path):
+        if path is not None:
+            datum = UnspecifiedDatum(DatumDefinition(path=path))
+            datums.append(datum)
+        return datums
+
     def _parse_job(self):
         if self.args.file is not None:
             return JobDefinition.model_validate_file(self.args.file)
 
+        # Reconstruct task from args
         task = TaskDefinition(
             name=self.args.component,
             library="local",
             arguments=self.args.argument,
-            input_data=[],
-            output_data=[],
+            input_data=self._add_datum([], self.args.input),
+            output_data=self._add_datum([], self.args.output),
         )
 
-        if self.args.input is not None:
-            # Todo: How to deal with not knowing the type of input
-            datum = EmptyDatum(DatumDefinition(path=self.args.input))
-            task.input_data.append(datum)
-        if self.args.output is not None:
-            datum = EmptyDatum(DatumDefinition(path=self.args.output))
-            task.output_data.append(datum)
-
-        return JobDefinition(tasks=[])
+        return JobDefinition(tasks=[task])
 
 
 class TerminalCommunicationBackend(CommunicationBackend):

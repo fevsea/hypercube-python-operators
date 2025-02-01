@@ -78,12 +78,22 @@ class Runtime:
         """Converts a task definition into an executable component."""
         component_class = self.catalog.get_component_for_task(task)
         options = component_class.Options.model_validate(task.options)
+
+        # TODO: Try to cast datum
         input_data = tuple(
             self._get_datum(datum_definition) for datum_definition in task.input_data
         )
+        output_data = tuple(
+            self._get_datum(datum_definition) for datum_definition in task.output_data
+        )
         context = self._build_context_for_class(task)
 
-        return component_class(context=context, input_data=input_data, options=options)
+        return component_class(
+            context=context,
+            input_data=input_data,
+            output_data=output_data,
+            options=options,
+        )
 
     def _build_context_for_class(self, task: TaskDefinition):
         return Context(self, task)

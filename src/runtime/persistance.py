@@ -3,7 +3,7 @@ import pickle
 import tomllib
 from enum import StrEnum
 from pathlib import Path
-from typing import BinaryIO, TextIO
+from typing import BinaryIO, TextIO, override
 
 import pandas as pd
 import yaml
@@ -21,7 +21,7 @@ class DatumDefinition(BaseModel):
         FOLDER = "folder"
         DATAFRAME = "dataframe"
         OBJECT = "object"
-        EMPTY = "empty"
+        NOT_YET_KNOWN = "not_yet_known"
 
     path: Path
     type: Type = Field(default=Type.FILE)
@@ -38,6 +38,9 @@ class Datum:
         """Only uncommitted data can be modified."""
         self._definition = datum_definition
 
+    def get_type(self) -> DatumDefinition.Type:
+        return self._definition.type
+
     @classmethod
     def datum_factory(cls, datum_definition) -> "Datum":
         """Creates the appropriate class for the given type"""
@@ -50,8 +53,8 @@ class Datum:
                 return DataFrameDatum(datum_definition)
             case DatumDefinition.Type.OBJECT:
                 return ObjectDatum(datum_definition)
-            case DatumDefinition.Type.EMPTY:
-                return EmptyDatum(datum_definition)
+            case DatumDefinition.Type.NOT_YET_KNOWN:
+                return UnspecifiedDatum(datum_definition)
             case _:
                 raise ValueError(f"Unknown datum type: {datum_definition.type}")
 
@@ -63,10 +66,11 @@ class FolderDatum(Datum):
         return self._definition.path
 
 
-class EmptyDatum(Datum):
-    """Represents an empty datum with no data.
+class UnspecifiedDatum(Datum):
+    """Represent a datum to which we don't know the type yet.
 
     Usually acts as a placeholder to indicate where a real datum should be saved.
+    In order to do anything meaningful with this datum it must be promoted to another type.
     """
 
     def promote(self, new_type: DatumDefinition.Type):
@@ -74,6 +78,10 @@ class EmptyDatum(Datum):
         definition = self._definition.model_copy()
         definition.type = new_type
         return Datum.datum_factory(self._definition)
+
+    @override
+    def get_type(self):
+        return None
 
 
 class FileDatum(Datum):

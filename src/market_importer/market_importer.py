@@ -14,6 +14,7 @@ from runtime.component_definition import (
     IoType,
 )
 from runtime.enums import is_valid_currency_pair
+from runtime.persistance import Datum
 
 
 class MarketImporter(Component):
@@ -42,7 +43,7 @@ class MarketImporter(Component):
     class Options(BaseModel):
         pass
 
-    def __init__(self, input_data: tuple[SlotData], options: Options, runtime=None):
+    def __init__(self, input_data: tuple[Datum], options: Options, runtime=None):
         super().__init__(input_data, options)
 
         self.runtime = None
@@ -52,7 +53,7 @@ class MarketImporter(Component):
 
         self.import_strategy: ImportStrategy | None = None
 
-    def run(self) -> tuple[SlotData]:
+    def run(self) -> tuple[Datum]:
         self.parse_folder_structure()
         for dfs in self.import_strategy.collect_iter():
             characterize_data(dfs)
