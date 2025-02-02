@@ -12,10 +12,10 @@ from runtime.persistance import ObjectDatum
 
 
 class DummyComponent(Component):
-    meta_name: str = "dummy_component"
-    meta_labels: tuple[str] = {ComponentTags.IMPORTER}
+    name: str = "dummy_component"
+    labels: tuple[str] = {ComponentTags.IMPORTER}
 
-    meta_input_slots: tuple[SlotDefinition] = (
+    input_slots: tuple[SlotDefinition] = (
         SlotDefinition(
             name="in",
             required=False,
@@ -23,7 +23,8 @@ class DummyComponent(Component):
             type=IoType.OBJECT,
         ),
     )
-    meta_output_slots: tuple[SlotDefinition] = (
+
+    output_slots: tuple[SlotDefinition] = (
         SlotDefinition(
             name="out",
             required=False,
@@ -52,7 +53,7 @@ def dummy_component():
 @pytest.fixture(scope="session")
 def dummy_catalog(dummy_component):
     return Catalog(
-        name="python-component-catalog",
+        name="",
         description="Basic components written in Python",
         components=[
             dummy_component,
