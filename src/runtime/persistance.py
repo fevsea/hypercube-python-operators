@@ -37,9 +37,16 @@ class Datum:
     def __init__(self, datum_definition: DatumDefinition):
         """Only uncommitted data can be modified."""
         self._definition = datum_definition
+        self._committed = False
 
     def get_type(self) -> DatumDefinition.Type:
         return self._definition.type
+
+    def is_committed(self) -> bool:
+        return self._committed
+
+    def commit(self):
+        self._committed = True
 
     @classmethod
     def datum_factory(cls, datum_definition) -> "Datum":
@@ -179,3 +186,8 @@ class ObjectDatum(FileDatum):
     def clear(self):
         """Remove the object from memory."""
         self._object = None
+
+    def set_object(self, data):
+        if self._committed:
+            raise RuntimeError("Cannot modify data of an already committed datum.")
+        self._object = data

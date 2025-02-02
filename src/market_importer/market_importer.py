@@ -40,7 +40,7 @@ class MarketImporter(Component):
         ),
     )
 
-    class Options(BaseModel):
+    class Options(Component.Options):
         pass
 
     def __init__(self, input_data: tuple[Datum], options: Options, runtime=None):
