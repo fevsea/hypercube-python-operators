@@ -23,7 +23,7 @@ class TaskDefinition(BaseModel):
     library: str = "local"
 
     # Parameters
-    arguments: dict[str, Any] = Field(default_factory=list)
+    options: dict[str, Any] = Field(default_factory=list)
     input_data: list[DatumDefinition] = Field(default_factory=list)
     output_data: list[DatumDefinition] = Field(default_factory=list)
 
@@ -94,8 +94,8 @@ class Component(abc.ABC):
 
         This is ideally a single-level object. By using a Pydantic model, we can define its range.
         """
-
-        pass
+        class Config:
+            extra = "allow"
 
     def __init__(
         self,

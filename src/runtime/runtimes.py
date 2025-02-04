@@ -19,7 +19,7 @@ class TaskDefinition(BaseModel):
     component: str
     version: str
 
-    options: dict = Field(default_factory=dict)  # noqa: intellij bug
+    arguments: dict = Field(default_factory=dict)  # noqa: intellij bug
     input_data: list[DatumDefinition | None | list[DatumDefinition]] = Field(
         default_factory=list
     )  # noqa: intellij bug

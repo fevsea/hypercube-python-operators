@@ -202,7 +202,7 @@ class SimpleCliCommunicationBackend(CommunicationBackend):
     @staticmethod
     def _add_datum(datums: list, path: Path):
         if path is not None:
-            datum = UnspecifiedDatum(DatumDefinition(path=path))
+            datum = DatumDefinition(path=path)
             datums.append(datum)
         return datums
 
@@ -213,8 +213,8 @@ class SimpleCliCommunicationBackend(CommunicationBackend):
         # Reconstruct task from args
         task = TaskDefinition(
             name=self.args.component,
-            library="local",
-            arguments=self.args.argument,
+            library="",
+            options=self.args.argument,
             input_data=self._add_datum([], self.args.input),
             output_data=self._add_datum([], self.args.output),
         )

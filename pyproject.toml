@@ -12,7 +12,7 @@ dependencies = [
     "pyyaml==6.0.2",
 ]
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "coverage>=7.5.2,<8",
     "pytest>=8.2.1,<9",
