@@ -1,7 +1,10 @@
 import abc
+from dataclasses import dataclass
+import functools
+import inspect
 import re
 from enum import StrEnum
-from typing import Any, Callable, Type
+from typing import Any, Callable, Type, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -135,3 +138,74 @@ class Component(abc.ABC):
     def get_human_name(self):
         """Return a human-readable name for the component."""
         return re.sub(r"\W+", " ", self.name)
+
+
+@dataclass
+class Input:
+    """Represents an input parameter for a component function."""
+
+    type: str
+
+
+@dataclass
+class Output:
+    """Represents an output parameter for a component function."""
+
+    type: str
+
+
+def command_component(
+    name: str,
+    version: str,
+    display_name: str = "",
+    description: str = "",
+) -> Callable:
+    """Decorator to define a command component with metadata.
+
+    Args:
+        name (str): The unique name of the component.
+        version (str): Version of the component.
+        display_name (str): Human-friendly component name.
+        description (str): Detailed description of what the component does.
+
+    Returns:
+        Callable: A decorated function with metadata stored.
+    """
+
+    def decorator(func: Callable) -> Callable:
+        # Extract the signature and annotations of the function
+        signature = inspect.signature(func)
+        annotations = func.__annotations__
+
+        # Metadata for the component
+        metadata = {
+            "name": name,
+            "version": version,
+            "display_name": display_name,
+            "description": description,
+            "input_slots": [],
+            "output_slots": [],
+        }
+
+        # Parse the function arguments using its annotations
+        for param_name, param in signature.parameters.items():
+            if param_name in annotations:
+                annotation = annotations[param_name]
+                if isinstance(annotation, Input):
+                    metadata["input_slots"].append(
+                        {"name": param_name, "type": annotation.type}
+                    )
+                elif isinstance(annotation, Output):
+                    metadata["output_slots"].append(
+                        {"name": param_name, "type": annotation.type}
+                    )
+
+        @functools.wraps(func)
+        def wrapped_function(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        # Attach metadata to the wrapped function
+        wrapped_function.metadata = metadata
+        return wrapped_function
+
+    return decorator
