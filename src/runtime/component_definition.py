@@ -77,44 +77,53 @@ class SlotDefinition(BaseModel):
     type: IoType = Field(default=IoType.FOLDER)
 
 
-class Component(abc.ABC):
-    """Define the interface for a component."""
+type Option = str | int | float | bool
 
-    # Metadata about the component
-    name: str = "GenericComponent"
-    description: str = ""
-    labels: set[str] = set()
+class Component:
+    """Holds a runnable component."""
 
-    # Describes the specific I/O shape of the Component.
-    input_slots: tuple[SlotDefinition, ...] = tuple()
-    output_slots: tuple[SlotDefinition, ...] = tuple()
 
-    class Options(BaseModel):
-        """A component can have arbitrary options.
 
-        This is ideally a single-level object. By using a Pydantic model, we can define its range.
-        """
-        class Config:
-            extra = "allow"
+    def __init__(self, runnable: Callable, name: str, input_slots: dict[str, SlotDefinition] = None, output_slots: dict[str, SlotDefinition] = None, options: dict[str, Option] = None, description: str = "", labels: set[str] = None, expects_context: bool=True):
+        # Metadata about the component
+        self.name: str = name
+        self.description: str = description
+        self.labels: set[str] = labels or set()
+        
+        # Describes the specific I/O shape of the Component.
+        self.input_slots: dict[str, SlotDefinition] = input_slots or {}
+        self.output_slots: dict[str, SlotDefinition] = output_slots or {}
+        self.available_options: TypedDict[str, Option] = options or {}
 
-    def __init__(
+        # Calling ingo
+        self.runnable: Callable = runnable
+        self.expects_context: bool = expects_context
+
+    def run(
         self,
         context: Context,
-        input_data: tuple[Datum | None | list[Datum], ...],
-        output_data: tuple[Datum | None | list[Datum], ...],
-        options: Options,
+        input_data: dict[Datum | None | list[Datum], ...],
+        output_data: dict[Datum | None | list[Datum], ...],
+        options: dict[str, Option] = None,
     ):
+        """Actually executes the component with specific data."""
         # An instance is tied to actual data and parameters
-        self.input_data = self._validate_slots(input_data, self.input_slots)
-        self.output_data = self._validate_slots(output_data, self.output_slots)
-        self.options = options
-        self.context = context
-        self.logger = context.get_logger(self.name)
+        # Todo: Rewrite validation
+        input_data = self._validate_slots(input_data, self.input_slots)
+        output_data = self._validate_slots(output_data, self.output_slots)
+        options = options or dict()
+        context = context
+
+        if self.expects_context:
+            self.runnable(context, input_data, output_data, options)
+        else:
+            self.runnable(input_data, output_data, options)
+
 
     @staticmethod
     def _validate_slots(
-        datums: tuple[Datum, ...],
-        slots: tuple[SlotDefinition, ...],
+        datums: dict[str, Datum],
+        slots: dict[str, SlotDefinition],
     ):
         if len(slots) != len(datums):
             # The zip validation below requires this invariant
