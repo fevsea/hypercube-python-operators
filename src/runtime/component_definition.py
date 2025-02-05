@@ -5,7 +5,7 @@ import inspect
 import re
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Callable, Type, TypedDict, TypeVar
+from typing import Any, Callable, Type, Iterable
 
 from pydantic import BaseModel, Field
 
@@ -74,9 +74,9 @@ class SlotDefinition:
     description: str = ""
 
     # What kind of data is expected
-    required: bool = Field(default=True)
-    multiple: bool = Field(default=False)
-    type: IoType = Field(default=IoType.FOLDER)
+    required: bool = True
+    multiple: bool = False
+    type: IoType = IoType.FOLDER
 
 
 @dataclass
@@ -94,6 +94,9 @@ class OptionDefinition:
 
         @classmethod
         def from_type(cls, python_type: Type):
+            # This is not done with a dict lookup to avoid
+            # polluting the enum options or moving the dict
+            # outside the class.
             if python_type == str:
                 return cls.STRING
             elif python_type == int:
@@ -131,14 +134,15 @@ class Component:
         output_slots: dict[str, SlotDefinition] = None,
         options: dict[str, OptionDefinition] = None,
         description: str = "",
-        labels: set[str] = None,
-        context_varname: bool = None,
+        labels: Iterable[str] = None,
+        context_varname: str = None,
         version: str = "1",
     ):
         # Metadata about the component
         self.name: str = name
         self.description: str = description
-        self.labels: set[str] = labels or set()
+        self.labels: set[str] = set(labels) or set()
+        self.version: str = version
 
         # Describes the specific I/O shape of the Component.
         self.input_slots: dict[str, SlotDefinition] = input_slots or {}
@@ -152,8 +156,8 @@ class Component:
     def run(
         self,
         context: Context,
-        input_data: dict[Datum | None | list[Datum], ...],
-        output_data: dict[Datum | None | list[Datum], ...],
+        input_data: dict[Datum | None | list[Datum]],
+        output_data: dict[Datum | None | list[Datum]],
         options: dict[str, OptionTypes] = None,
     ):
         """Actually executes the component with specific data."""
@@ -206,13 +210,13 @@ class Component:
 
 @dataclass
 class InoutType:
-    """Type used with the command_c component decorator to denote the type of parameter."""
+    """Type used with the command_component decorator to denote the type of parameter."""
 
     description: str = ""
     name: str = None
-    required: bool = Field(default=True)
-    multiple: bool = Field(default=False)
-    type: IoType = Field(default=IoType.FOLDER)
+    required: bool = True
+    multiple: bool = False
+    type: IoType = IoType.FOLDER
 
 
 class Input(InoutType):
@@ -240,11 +244,9 @@ def command_component(
     name: str,
     version: str = "1",
     description: str = "",
-    labels: set[str] = None,
+    labels: Iterable[str] = None,
 ) -> Callable:
     """Decorator that defines a runnable component.
-
-    It runs
     """
 
     def decorator(func: Callable) -> Callable:
@@ -277,7 +279,7 @@ def command_component(
                     metadata["options"][param_name] = OptionDefinition(
                         name=param_name,
                         description=annotation.description,
-                        default=annotation.default,
+                        default=param.default,
                         required=annotation.required,
                         min=annotation.min,
                         max=annotation.max,
@@ -315,7 +317,7 @@ def command_component(
         def wrapped_function(*args, **kwargs):
             return func(*args, **kwargs)
 
-        metadata["runnable"] = wrapped_function
+        metadata["runnable"] = wrapped_function  # noqa
         component = Component(**metadata)
         wrapped_function.component = component
         wrapped_function.metadata = metadata

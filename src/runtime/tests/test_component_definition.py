@@ -1,5 +1,6 @@
-import pytest
-from runtime.component_definition import command_component, Input, Output, Option
+
+from runtime.component_definition import SlotDefinition, command_component, OptionDefinition, Output, Option, Component, OptionDefinition, \
+    IoType
 
 
 def test_command_component_metadata():
@@ -9,29 +10,29 @@ def test_command_component_metadata():
         description="A test command component",
         labels=["1.0"],
     )
-    def test_func(param1: Option(type=int), param2: Output()):
+    def test_func(param2: Output(), param1: Option(type=int) = 1):
         pass
 
-    metadata = test_func.metadata
+    component: Component = test_func.component
 
-    assert metadata["name"] == "test_component"
-    assert metadata["version"] == "1.0"
-    assert metadata["display_name"] == "Test Component"
-    assert metadata["description"] == "A test command component"
-    assert metadata["input_slots"] == [{"name": "param1", "type": Input.type}]
-    assert metadata["output_slots"] == [{"name": "param2", "type": Output.type}]
+    assert isinstance(component, Component)
+    assert component.name == "test_component"
+    assert component.version == "1.0"
+    assert component.description == "A test command component"
+    assert component.labels == {"1.0",}
 
+    assert not component.input_slots  # Is empty
+    assert "param1" in component.available_options
+    assert "param2" in component.output_slots
 
-def test_command_component_without_optional_metadata():
-    @command_component(name="minimal_component", version="1.0")
-    def another_func():
-        pass
+    param1: OptionDefinition = component.available_options["param1"]
+    param2 = component.output_slots["param2"]
 
-    metadata = another_func.metadata
+    assert isinstance(param1, OptionDefinition)
+    assert param1.type == OptionDefinition.Types.INTEGER
+    assert param1.name == "param1"
+    assert param1.default == 1
 
-    assert metadata["name"] == "minimal_component"
-    assert metadata["version"] == "1.0"
-    assert metadata["display_name"] == ""
-    assert metadata["description"] == ""
-    assert metadata["input_slots"] == []
-    assert metadata["output_slots"] == []
+    assert isinstance(param2, SlotDefinition)
+    assert param2.name == "param2"
+    assert param2.type == IoType.FOLDER
