@@ -3,8 +3,9 @@ from dataclasses import dataclass
 import functools
 import inspect
 import re
+from datetime import datetime
 from enum import StrEnum
-from typing import Any, Callable, Type, TypedDict
+from typing import Any, Callable, Type, TypedDict, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -61,7 +62,8 @@ class IoType(StrEnum):
     OBJECT = "object"
 
 
-class SlotDefinition(BaseModel):
+@dataclass
+class SlotDefinition:
     """Describes an input/output slot.
 
     Two components can be connected if they have compatible IoSlot objects.
@@ -69,7 +71,7 @@ class SlotDefinition(BaseModel):
 
     # Meta
     name: str
-    labels: set[str] = set()
+    description: str = ""
 
     # What kind of data is expected
     required: bool = Field(default=True)
@@ -77,34 +79,82 @@ class SlotDefinition(BaseModel):
     type: IoType = Field(default=IoType.FOLDER)
 
 
-type Option = str | int | float | bool
+@dataclass
+class OptionDefinition:
+    """Describes an option parameter."""
+
+    class Types(StrEnum):
+        """Types of options."""
+
+        STRING = "string"
+        INTEGER = "integer"
+        FLOAT = "float"
+        BOOLEAN = "boolean"
+        DATETIME = "datetime"
+
+        @classmethod
+        def from_type(cls, python_type: Type):
+            if python_type == str:
+                return cls.STRING
+            elif python_type == int:
+                return cls.INTEGER
+            elif python_type == float:
+                return cls.FLOAT
+            elif python_type == bool:
+                return cls.BOOLEAN
+            elif python_type == datetime:
+                return cls.DATETIME
+            else:
+                raise ValueError(f"Unknown type: {python_type}")
+
+    name: str
+    description: str = ""
+    type: Types = Types.STRING
+    default: any = None
+    required: bool = True
+    min: None | int | float = None
+    max: None | int | float = None
+    enum: None | list[str] = None
+
+
+type OptionTypes = str | int | float | bool
+
 
 class Component:
     """Holds a runnable component."""
 
-
-
-    def __init__(self, runnable: Callable, name: str, input_slots: dict[str, SlotDefinition] = None, output_slots: dict[str, SlotDefinition] = None, options: dict[str, Option] = None, description: str = "", labels: set[str] = None, expects_context: bool=True):
+    def __init__(
+        self,
+        runnable: Callable,
+        name: str,
+        input_slots: dict[str, SlotDefinition] = None,
+        output_slots: dict[str, SlotDefinition] = None,
+        options: dict[str, OptionDefinition] = None,
+        description: str = "",
+        labels: set[str] = None,
+        context_varname: bool = None,
+        version: str = "1",
+    ):
         # Metadata about the component
         self.name: str = name
         self.description: str = description
         self.labels: set[str] = labels or set()
-        
+
         # Describes the specific I/O shape of the Component.
         self.input_slots: dict[str, SlotDefinition] = input_slots or {}
         self.output_slots: dict[str, SlotDefinition] = output_slots or {}
-        self.available_options: TypedDict[str, Option] = options or {}
+        self.available_options: dict[str, OptionTypes] = options or {}
 
         # Calling ingo
         self.runnable: Callable = runnable
-        self.expects_context: bool = expects_context
+        self.context_varname: str = context_varname
 
     def run(
         self,
         context: Context,
         input_data: dict[Datum | None | list[Datum], ...],
         output_data: dict[Datum | None | list[Datum], ...],
-        options: dict[str, Option] = None,
+        options: dict[str, OptionTypes] = None,
     ):
         """Actually executes the component with specific data."""
         # An instance is tied to actual data and parameters
@@ -114,11 +164,11 @@ class Component:
         options = options or dict()
         context = context
 
-        if self.expects_context:
-            self.runnable(context, input_data, output_data, options)
-        else:
-            self.runnable(input_data, output_data, options)
+        params = {**options, **input_data, **output_data}
+        if self.context_varname is not None:
+            params[self.context_varname] = context
 
+        self.runnable(**params)
 
     @staticmethod
     def _validate_slots(
@@ -149,39 +199,60 @@ class Component:
         return re.sub(r"\W+", " ", self.name)
 
 
+###
+# Decorator
+###
+
+
 @dataclass
-class Input:
+class InoutType:
+    """Type used with the command_c component decorator to denote the type of parameter."""
+
+    description: str = ""
+    name: str = None
+    required: bool = Field(default=True)
+    multiple: bool = Field(default=False)
+    type: IoType = Field(default=IoType.FOLDER)
+
+
+class Input(InoutType):
     """Represents an input parameter for a component function."""
 
-    type: str
+
+class Output(InoutType):
+    """Represents an output parameter for a component function."""
 
 
 @dataclass
-class Output:
-    """Represents an output parameter for a component function."""
+class Option:
+    """Represents an option parameter for a component function."""
 
-    type: str
+    type: Type = str
+    description: str = ""
+    default: any = None
+    required: bool = True
+    min: None | int | float = None
+    max: None | int | float = None
+    enum: None | list[str] = None
 
 
 def command_component(
     name: str,
-    version: str,
-    display_name: str = "",
+    version: str = "1",
     description: str = "",
+    labels: set[str] = None,
 ) -> Callable:
-    """Decorator to define a command component with metadata.
+    """Decorator that defines a runnable component.
 
-    Args:
-        name (str): The unique name of the component.
-        version (str): Version of the component.
-        display_name (str): Human-friendly component name.
-        description (str): Detailed description of what the component does.
-
-    Returns:
-        Callable: A decorated function with metadata stored.
+    It runs
     """
 
     def decorator(func: Callable) -> Callable:
+        if not callable(func) or not inspect.isfunction(func):
+            raise TypeError(
+                "The @command_component decorator can only be applied to functions."
+            )
+
         # Extract the signature and annotations of the function
         signature = inspect.signature(func)
         annotations = func.__annotations__
@@ -190,30 +261,63 @@ def command_component(
         metadata = {
             "name": name,
             "version": version,
-            "display_name": display_name,
+            "labels": labels,
             "description": description,
-            "input_slots": [],
-            "output_slots": [],
+            "input_slots": {},
+            "output_slots": {},
+            "options": {},
+            "context_varname": None,
         }
 
         # Parse the function arguments using its annotations
         for param_name, param in signature.parameters.items():
             if param_name in annotations:
                 annotation = annotations[param_name]
-                if isinstance(annotation, Input):
-                    metadata["input_slots"].append(
-                        {"name": param_name, "type": annotation.type}
+                if isinstance(annotation, Option):
+                    metadata["options"][param_name] = OptionDefinition(
+                        name=param_name,
+                        description=annotation.description,
+                        default=annotation.default,
+                        required=annotation.required,
+                        min=annotation.min,
+                        max=annotation.max,
+                        enum=annotation.enum,
+                        type=OptionDefinition.Types.from_type(annotation.type),
+                    )
+                elif isinstance(annotation, Input):
+                    metadata["input_slots"][param_name] = SlotDefinition(
+                        name=param_name,
+                        description=annotation.description,
+                        required=annotation.required,
+                        multiple=annotation.multiple,
+                        type=annotation.type,
                     )
                 elif isinstance(annotation, Output):
-                    metadata["output_slots"].append(
-                        {"name": param_name, "type": annotation.type}
+                    metadata["output_slots"][param_name] = SlotDefinition(
+                        name=param_name,
+                        description=annotation.description,
+                        required=annotation.required,
+                        multiple=annotation.multiple,
+                        type=annotation.type,
                     )
+                else:
+                    raise ValueError(
+                        f"Parameter {param_name} in the function signature has an unsupported annotation: {annotation}"
+                    )
+            else:
+                if param_name in ("context", "ctx"):
+                    metadata["context_varname"] = param_name
+                raise ValueError(
+                    f"Parameter {param_name} in the function signature is missing an annotation."
+                )
 
         @functools.wraps(func)
         def wrapped_function(*args, **kwargs):
             return func(*args, **kwargs)
 
-        # Attach metadata to the wrapped function
+        metadata["runnable"] = wrapped_function
+        component = Component(**metadata)
+        wrapped_function.component = component
         wrapped_function.metadata = metadata
         return wrapped_function
 

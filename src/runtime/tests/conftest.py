@@ -33,10 +33,6 @@ class DummyComponent(Component):
         ),
     )
 
-    class Options(Component.Options):
-        int_option: int | None = None
-        str_option: str | None = None
-
     def run(self):
         in_data: ObjectDatum = self.input_data[0]
         out_data: ObjectDatum = self.output_data[0]
@@ -47,7 +43,8 @@ class DummyComponent(Component):
 
 @pytest.fixture(scope="session")
 def dummy_component():
-    return DummyComponent
+    # Todo: Fix
+    return None
 
 
 @pytest.fixture(scope="session")

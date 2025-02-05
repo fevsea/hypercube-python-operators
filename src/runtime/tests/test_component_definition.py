@@ -1,15 +1,15 @@
 import pytest
-from runtime.component_definition import command_component, Input, Output
+from runtime.component_definition import command_component, Input, Output, Option
 
 
 def test_command_component_metadata():
     @command_component(
         name="test_component",
         version="1.0",
-        display_name="Test Component",
         description="A test command component",
+        labels=["1.0"],
     )
-    def test_func(param1: Input(type="test"), param2: Output):
+    def test_func(param1: Option(type=int), param2: Output()):
         pass
 
     metadata = test_func.metadata
