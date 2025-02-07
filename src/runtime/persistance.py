@@ -27,8 +27,8 @@ class DatumDefinition(BaseModel):
     type: Type = Field(default=Type.FILE)
     hash: str | None = None
 
-type DatumInput = Annotated[Datum, "Input"]
-type DatumOutput = Annotated[Datum, "Output"]
+type DatumInput = Annotated[Datum, "input"]
+type DatumOutput = Annotated[Datum, "output"]
 class Datum:
     """Represents a unit of data on the cluster.
 
@@ -52,7 +52,6 @@ class Datum:
     @classmethod
     def datum_factory(cls, datum_definition: DatumDefinition) -> "Datum":
         """Creates the appropriate class for the given type"""
-        if datum_definition.
         match datum_definition.type:
             case DatumDefinition.Type.FILE:
                 return FileDatum(datum_definition)
@@ -67,8 +66,8 @@ class Datum:
             case _:
                 raise ValueError(f"Unknown datum type: {datum_definition.type}")
 
-type FolderDatumInput = Annotated[FolderDatum, "Input"]
-type FolderDatumOutput = Annotated[FolderDatum, "Output"]
+type FolderDatumInput = Annotated[FolderDatum, "input"]
+type FolderDatumOutput = Annotated[FolderDatum, "output"]
 class FolderDatum(Datum):
     """Represents a folder on disk."""
 
@@ -76,8 +75,8 @@ class FolderDatum(Datum):
         return self._definition.path
 
 
-type UnspecifiedDatumInput = Annotated[UnspecifiedDatum, "Input"]
-type UnspecifiedDatumOutput = Annotated[UnspecifiedDatum, "Output"]
+type UnspecifiedDatumInput = Annotated[UnspecifiedDatum, "input"]
+type UnspecifiedDatumOutput = Annotated[UnspecifiedDatum, "output"]
 class UnspecifiedDatum(Datum):
     """Represent a datum to which we don't know the type yet.
 
@@ -95,8 +94,8 @@ class UnspecifiedDatum(Datum):
     def get_type(self):
         return None
 
-type FileDatumInput = Annotated[FileDatum, "Input"]
-type FileDatumOutput = Annotated[FileDatum, "Output"]
+type FileDatumInput = Annotated[FileDatum, "input"]
+type FileDatumOutput = Annotated[FileDatum, "output"]
 class FileDatum(Datum):
     """Represents a file on disk.
 
@@ -142,8 +141,8 @@ class FileDatum(Datum):
         else:
             return files[0].name
 
-type DataFrameDatumInput = Annotated[DataFrameDatum, "Input"]
-type DataFrameDatumOutput = Annotated[DataFrameDatum, "Output"]
+type DataFrameDatumInput = Annotated[DataFrameDatum, "input"]
+type DataFrameDatumOutput = Annotated[DataFrameDatum, "output"]
 class DataFrameDatum(FileDatum):
     """Represents a dataframe on disk. It is a special case of FileDatum provided for convenience."""
 
@@ -161,8 +160,8 @@ class DataFrameDatum(FileDatum):
         """Remove the dataframe from memory."""
         self._df = None
 
-type ObjectDatumInput = Annotated[ObjectDatum, "Input"]
-type ObjectDatumOutput = Annotated[ObjectDatum, "Output"]
+type ObjectDatumInput = Annotated[ObjectDatum, "input", sampleA="as"]
+type ObjectDatumOutput = Annotated[ObjectDatum, "output"]
 class ObjectDatum(FileDatum):
     """Returns an arbitrary python object.
 
@@ -200,7 +199,7 @@ class ObjectDatum(FileDatum):
             raise RuntimeError("Cannot modify data of an already committed datum.")
         self._object = data
 
-type DatumFactoryOutput = Annotated[DatumFactory, "Output"]
+type DatumFactoryOutput = Annotated[DatumFactory, "output"]
 class DatumFactory(Datum):
     """Special type of datums that allow for the creation of multiple datums.
 

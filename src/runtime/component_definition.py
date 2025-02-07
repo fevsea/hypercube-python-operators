@@ -4,7 +4,7 @@ import inspect
 import re
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Callable, Type, Iterable, TypeAliasType
+from typing import Any, Callable, Type, Iterable, TypeAliasType, Annotated, _AnnotatedAlias
 
 from pydantic import BaseModel, Field
 
@@ -266,11 +266,15 @@ def command_component(
         for param_name, param in signature.parameters.items():
             if param_name in annotations:
                 annotation = annotations[param_name]
+                annotation_type = annotation
+                annotation_metadata = {}
                 if isinstance(annotation, TypeAliasType):
                     annotation = annotation.__value__
+                if isinstance(annotation, _AnnotatedAlias):
+                    annotation_type = annotation.__origin__
+                    annotation_metadata = annotation.__metadata__
 
-                if type
-                if isinstance(annotation, Option):
+                if "input" in annotation_metadata:
                     metadata["options"][param_name] = OptionDefinition(
                         name=param_name,
                         description=annotation.description,
