@@ -1,3 +1,7 @@
+from typing import Annotated
+
+from annotated_types import Gt, Lt, Interval
+
 from runtime.component_definition import (
     SlotDefinition,
     command_component,
@@ -54,7 +58,7 @@ def test_command_component_single_input():
         description="A test command component",
         labels=["1.0"],
     )
-    def test_func(param1: FolderDatumInput):
+    def test_func(param1: Annotated[FolderDatumInput, Gt(2), Lt(10)]):
         pass
 
     component: Component = test_func.component

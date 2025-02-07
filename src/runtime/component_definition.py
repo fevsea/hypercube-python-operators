@@ -4,6 +4,7 @@ import inspect
 import re
 from datetime import datetime
 from enum import StrEnum
+from inspect import Parameter
 from typing import (
     Any,
     Callable,
@@ -14,6 +15,7 @@ from typing import (
     _AnnotatedAlias,
 )
 
+from annotated_types import Gt, Ge, Lt, Le, Interval
 from pydantic import BaseModel, Field
 
 from runtime.persistance import Datum, DatumDefinition
@@ -240,6 +242,51 @@ class Option:
     enum: None | list[str] = None
 
 
+def decode_param(param_name: str, param: Parameter, annotation) ->dict[str, Any]:
+    """Read the metadata associated with the parmeter as well as it's type"""
+
+
+    if isinstance(annotation, TypeAliasType):
+        annotation = annotation.__value__
+
+    annotation_type = annotation
+
+    annotation_metadata = {}
+
+    if isinstance(annotation, _AnnotatedAlias):
+        annotation_type = annotation.__origin__
+        annotation_metadata = annotation.__metadata__
+
+    decoded = {
+        "type": annotation_type,
+        "name": param_name,
+    }
+
+
+
+    for item in annotation_metadata:
+        if item is str:
+            decoded[item] = True
+            continue
+        if hasattr(item, "gt"):
+            if "min" in decoded:
+                raise RuntimeError(f"Annotation for {param_name} param already has a min value")
+            decoded["min"] = item.gt
+        if hasattr(item, "ge"):
+            if "min" in decoded:
+                raise RuntimeError(f"Annotation for {param_name} param already has a min value")
+            decoded["min"] = item.ge
+        if hasattr(item, "lt"):
+            if "min" in decoded:
+                raise RuntimeError(f"Annotation for {param_name} param already has a max value")
+            decoded["min"] = item.lt
+        if hasattr(item, "le"):
+            if "max" in decoded:
+                raise RuntimeError(f"Annotation for {param_name} param already has a max value")
+            decoded["max"] = item.le
+
+    return decoded
+
 def command_component(
     name: str,
     version: str = "1",
@@ -254,10 +301,6 @@ def command_component(
                 "The @command_component decorator can only be applied to functions."
             )
 
-        # Extract the signature and annotations of the function
-        signature = inspect.signature(func)
-        annotations = func.__annotations__
-
         # Metadata for the component
         metadata = {
             "name": name,
@@ -270,8 +313,13 @@ def command_component(
             "context_varname": None,
         }
 
+        # Extract the signature and annotations of the function
+        signature = inspect.signature(func)
+        annotations = func.__annotations__
+
         # Parse the function arguments using its annotations
         for param_name, param in signature.parameters.items():
+            decoded_param = decode_param(param_name, param, annotations.get(param_name, None))
             if param_name in annotations:
                 annotation = annotations[param_name]
                 annotation_type = annotation
