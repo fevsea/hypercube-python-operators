@@ -1,6 +1,7 @@
 
-from runtime.component_definition import SlotDefinition, command_component, OptionDefinition, Output, Option, Component, OptionDefinition, \
+from runtime.component_definition import SlotDefinition, command_component, OptionDefinition, Option, Component, OptionDefinition, \
     IoType
+from runtime.persistance import FolderDatum, FolderDatumInput, FolderDatumOutput
 
 
 def test_command_component_metadata():
@@ -10,7 +11,7 @@ def test_command_component_metadata():
         description="A test command component",
         labels=["1.0"],
     )
-    def test_func(param2: Output(), param1: Option(type=int) = 1):
+    def test_func(param1: FolderDatumInput, param2: FolderDatumOutput, param3: int = 3):
         pass
 
     component: Component = test_func.component

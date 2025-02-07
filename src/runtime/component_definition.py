@@ -1,11 +1,10 @@
-import abc
 from dataclasses import dataclass
 import functools
 import inspect
 import re
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Callable, Type, Iterable
+from typing import Any, Callable, Type, Iterable, TypeAliasType
 
 from pydantic import BaseModel, Field
 
@@ -68,12 +67,8 @@ class SlotDefinition:
 
     Two components can be connected if they have compatible IoSlot objects.
     """
-
-    # Meta
     name: str
     description: str = ""
-
-    # What kind of data is expected
     required: bool = True
     multiple: bool = False
     type: IoType = IoType.FOLDER
@@ -156,8 +151,8 @@ class Component:
     def run(
         self,
         context: Context,
-        input_data: dict[Datum | None | list[Datum]],
-        output_data: dict[Datum | None | list[Datum]],
+        input_data: dict[str, Datum | None | list[Datum]],
+        output_data: dict[str, Datum | None | list[Datum]],
         options: dict[str, OptionTypes] = None,
     ):
         """Actually executes the component with specific data."""
@@ -205,7 +200,12 @@ class Component:
 
 ###
 # Decorator
+#
+# The most convenient way to define components is with the decorator
+# It will internally build a Component object and associate it with the fn
+# In this section lays the decorator and the types it uses.
 ###
+
 
 
 @dataclass
@@ -217,15 +217,6 @@ class InoutType:
     required: bool = True
     multiple: bool = False
     type: IoType = IoType.FOLDER
-
-
-class Input(InoutType):
-    """Represents an input parameter for a component function."""
-
-
-class Output(InoutType):
-    """Represents an output parameter for a component function."""
-
 
 @dataclass
 class Option:
@@ -275,6 +266,10 @@ def command_component(
         for param_name, param in signature.parameters.items():
             if param_name in annotations:
                 annotation = annotations[param_name]
+                if isinstance(annotation, TypeAliasType):
+                    annotation = annotation.__value__
+
+                if type
                 if isinstance(annotation, Option):
                     metadata["options"][param_name] = OptionDefinition(
                         name=param_name,
@@ -301,6 +296,18 @@ def command_component(
                         required=annotation.required,
                         multiple=annotation.multiple,
                         type=annotation.type,
+                    )
+                elif annotation == Context:
+                    metadata["context_varname"] = param_name
+                elif annotation in (str, int, float, bool, datetime):
+                    metadata["options"][param_name] = OptionDefinition(
+                        name=param_name,
+                        default=param.default,
+                        required=param.default is None,
+                        min=None,
+                        max=None,
+                        enum=None,
+                        type=OptionDefinition.Types.from_type(annotation),
                     )
                 else:
                     raise ValueError(

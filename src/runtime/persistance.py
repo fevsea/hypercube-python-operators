@@ -3,7 +3,7 @@ import pickle
 import tomllib
 from enum import StrEnum
 from pathlib import Path
-from typing import BinaryIO, TextIO, override
+from typing import BinaryIO, TextIO, override, Annotated
 
 import pandas as pd
 import yaml
@@ -27,7 +27,8 @@ class DatumDefinition(BaseModel):
     type: Type = Field(default=Type.FILE)
     hash: str | None = None
 
-
+type DatumInput = Annotated[Datum, "Input"]
+type DatumOutput = Annotated[Datum, "Output"]
 class Datum:
     """Represents a unit of data on the cluster.
 
@@ -49,8 +50,9 @@ class Datum:
         self._committed = True
 
     @classmethod
-    def datum_factory(cls, datum_definition) -> "Datum":
+    def datum_factory(cls, datum_definition: DatumDefinition) -> "Datum":
         """Creates the appropriate class for the given type"""
+        if datum_definition.
         match datum_definition.type:
             case DatumDefinition.Type.FILE:
                 return FileDatum(datum_definition)
@@ -65,7 +67,8 @@ class Datum:
             case _:
                 raise ValueError(f"Unknown datum type: {datum_definition.type}")
 
-
+type FolderDatumInput = Annotated[FolderDatum, "Input"]
+type FolderDatumOutput = Annotated[FolderDatum, "Output"]
 class FolderDatum(Datum):
     """Represents a folder on disk."""
 
@@ -73,6 +76,8 @@ class FolderDatum(Datum):
         return self._definition.path
 
 
+type UnspecifiedDatumInput = Annotated[UnspecifiedDatum, "Input"]
+type UnspecifiedDatumOutput = Annotated[UnspecifiedDatum, "Output"]
 class UnspecifiedDatum(Datum):
     """Represent a datum to which we don't know the type yet.
 
@@ -90,7 +95,8 @@ class UnspecifiedDatum(Datum):
     def get_type(self):
         return None
 
-
+type FileDatumInput = Annotated[FileDatum, "Input"]
+type FileDatumOutput = Annotated[FileDatum, "Output"]
 class FileDatum(Datum):
     """Represents a file on disk.
 
@@ -136,7 +142,8 @@ class FileDatum(Datum):
         else:
             return files[0].name
 
-
+type DataFrameDatumInput = Annotated[DataFrameDatum, "Input"]
+type DataFrameDatumOutput = Annotated[DataFrameDatum, "Output"]
 class DataFrameDatum(FileDatum):
     """Represents a dataframe on disk. It is a special case of FileDatum provided for convenience."""
 
@@ -154,7 +161,8 @@ class DataFrameDatum(FileDatum):
         """Remove the dataframe from memory."""
         self._df = None
 
-
+type ObjectDatumInput = Annotated[ObjectDatum, "Input"]
+type ObjectDatumOutput = Annotated[ObjectDatum, "Output"]
 class ObjectDatum(FileDatum):
     """Returns an arbitrary python object.
 
@@ -191,3 +199,13 @@ class ObjectDatum(FileDatum):
         if self._committed:
             raise RuntimeError("Cannot modify data of an already committed datum.")
         self._object = data
+
+type DatumFactoryOutput = Annotated[DatumFactory, "Output"]
+class DatumFactory(Datum):
+    """Special type of datums that allow for the creation of multiple datums.
+
+    The datum definition acts as a template to create multiple ones.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._object = None
