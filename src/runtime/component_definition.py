@@ -4,7 +4,15 @@ import inspect
 import re
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Callable, Type, Iterable, TypeAliasType, Annotated, _AnnotatedAlias
+from typing import (
+    Any,
+    Callable,
+    Type,
+    Iterable,
+    TypeAliasType,
+    Annotated,
+    _AnnotatedAlias,
+)
 
 from pydantic import BaseModel, Field
 
@@ -67,6 +75,7 @@ class SlotDefinition:
 
     Two components can be connected if they have compatible IoSlot objects.
     """
+
     name: str
     description: str = ""
     required: bool = True
@@ -207,7 +216,6 @@ class Component:
 ###
 
 
-
 @dataclass
 class InoutType:
     """Type used with the command_component decorator to denote the type of parameter."""
@@ -217,6 +225,7 @@ class InoutType:
     required: bool = True
     multiple: bool = False
     type: IoType = IoType.FOLDER
+
 
 @dataclass
 class Option:
@@ -237,8 +246,7 @@ def command_component(
     description: str = "",
     labels: Iterable[str] = None,
 ) -> Callable:
-    """Decorator that defines a runnable component.
-    """
+    """Decorator that defines a runnable component."""
 
     def decorator(func: Callable) -> Callable:
         if not callable(func) or not inspect.isfunction(func):
@@ -274,7 +282,7 @@ def command_component(
                     annotation_type = annotation.__origin__
                     annotation_metadata = annotation.__metadata__
 
-                if "input" in annotation_metadata:
+                if isinstance(annotation, OptionDefinition):
                     metadata["options"][param_name] = OptionDefinition(
                         name=param_name,
                         description=annotation.description,
@@ -285,7 +293,7 @@ def command_component(
                         enum=annotation.enum,
                         type=OptionDefinition.Types.from_type(annotation.type),
                     )
-                elif isinstance(annotation, Input):
+                elif "input" in annotation_metadata:
                     metadata["input_slots"][param_name] = SlotDefinition(
                         name=param_name,
                         description=annotation.description,
@@ -293,7 +301,7 @@ def command_component(
                         multiple=annotation.multiple,
                         type=annotation.type,
                     )
-                elif isinstance(annotation, Output):
+                elif isinstance(annotation, Datum) or "output" in annotation_metadata:
                     metadata["output_slots"][param_name] = SlotDefinition(
                         name=param_name,
                         description=annotation.description,
@@ -323,6 +331,8 @@ def command_component(
                 raise ValueError(
                     f"Parameter {param_name} in the function signature is missing an annotation."
                 )
+
+        #if isinstance(arg, (annotated_types.BaseMetadata)
 
         @functools.wraps(func)
         def wrapped_function(*args, **kwargs):

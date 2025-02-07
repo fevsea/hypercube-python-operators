@@ -27,8 +27,11 @@ class DatumDefinition(BaseModel):
     type: Type = Field(default=Type.FILE)
     hash: str | None = None
 
+
 type DatumInput = Annotated[Datum, "input"]
 type DatumOutput = Annotated[Datum, "output"]
+
+
 class Datum:
     """Represents a unit of data on the cluster.
 
@@ -66,8 +69,11 @@ class Datum:
             case _:
                 raise ValueError(f"Unknown datum type: {datum_definition.type}")
 
+
 type FolderDatumInput = Annotated[FolderDatum, "input"]
 type FolderDatumOutput = Annotated[FolderDatum, "output"]
+
+
 class FolderDatum(Datum):
     """Represents a folder on disk."""
 
@@ -77,6 +83,8 @@ class FolderDatum(Datum):
 
 type UnspecifiedDatumInput = Annotated[UnspecifiedDatum, "input"]
 type UnspecifiedDatumOutput = Annotated[UnspecifiedDatum, "output"]
+
+
 class UnspecifiedDatum(Datum):
     """Represent a datum to which we don't know the type yet.
 
@@ -94,8 +102,11 @@ class UnspecifiedDatum(Datum):
     def get_type(self):
         return None
 
+
 type FileDatumInput = Annotated[FileDatum, "input"]
 type FileDatumOutput = Annotated[FileDatum, "output"]
+
+
 class FileDatum(Datum):
     """Represents a file on disk.
 
@@ -141,8 +152,11 @@ class FileDatum(Datum):
         else:
             return files[0].name
 
+
 type DataFrameDatumInput = Annotated[DataFrameDatum, "input"]
 type DataFrameDatumOutput = Annotated[DataFrameDatum, "output"]
+
+
 class DataFrameDatum(FileDatum):
     """Represents a dataframe on disk. It is a special case of FileDatum provided for convenience."""
 
@@ -160,8 +174,11 @@ class DataFrameDatum(FileDatum):
         """Remove the dataframe from memory."""
         self._df = None
 
-type ObjectDatumInput = Annotated[ObjectDatum, "input", sampleA="as"]
+
+type ObjectDatumInput = Annotated[ObjectDatum, "input"]
 type ObjectDatumOutput = Annotated[ObjectDatum, "output"]
+
+
 class ObjectDatum(FileDatum):
     """Returns an arbitrary python object.
 
@@ -199,12 +216,16 @@ class ObjectDatum(FileDatum):
             raise RuntimeError("Cannot modify data of an already committed datum.")
         self._object = data
 
+
 type DatumFactoryOutput = Annotated[DatumFactory, "output"]
+
+
 class DatumFactory(Datum):
     """Special type of datums that allow for the creation of multiple datums.
 
     The datum definition acts as a template to create multiple ones.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._object = None
