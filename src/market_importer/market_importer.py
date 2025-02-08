@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from pydantic import BaseModel
-
 from market_importer.stratergies import (
     ImportStrategy,
     MultipleFolderImporter,
@@ -11,7 +9,6 @@ from runtime.component_definition import (
     Component,
     ComponentTags,
     SlotDefinition,
-    IoType,
 )
 from runtime.enums import is_valid_currency_pair
 from runtime.persistance import Datum

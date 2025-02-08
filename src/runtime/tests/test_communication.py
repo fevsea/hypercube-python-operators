@@ -2,6 +2,7 @@ from unittest.mock import patch, Mock
 
 import pytest
 from pydantic import BaseModel
+
 from src.runtime.communication import (
     CommunicationBackend,
     Message,

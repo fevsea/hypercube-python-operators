@@ -1,5 +1,4 @@
-from typing import Dict, Type, TYPE_CHECKING
-
+from typing import Dict, Type
 
 from runtime.component_definition import Component, TaskDefinition
 
@@ -15,16 +14,16 @@ class Catalog:
     """
 
     def __init__(
-        self, name: str, components: list[Type[Component]], description: str = ""
+        self, name: str, components: list[Component], description: str = ""
     ):
         """Library name (as id)"""
         self.name: str = name
         self.description: str = description
-        self.components: Dict[str, Type[Component]] = {
+        self.components: Dict[str, Component] = {
             component.name.lower(): component for component in components
         }
 
-    def get_component_for_task(self, task: TaskDefinition) -> Type[Component]:
+    def get_component_for_task(self, task: TaskDefinition) -> Component:
         if task.library.lower() != self.name.lower():
             raise ValueError(
                 f"The task uses a component from another library '{task.library}'"

@@ -1,13 +1,11 @@
 from typing import Annotated
 
-from annotated_types import Gt, Lt, Interval
+from annotated_types import Gt, Lt
 from typing_extensions import Doc
 
 from runtime.component_definition import (
     SlotDefinition,
     command_component,
-    OptionDefinition,
-    Option,
     Component,
     OptionDefinition,
 )

@@ -1,49 +1,27 @@
 import pytest
-from pydantic import BaseModel
 
 from runtime.catalog_base import Catalog
 from runtime.component_definition import (
-    Component,
     ComponentTags,
-    SlotDefinition,
+    command_component,
 )
-from runtime.persistance import ObjectDatum
+from runtime.persistance import ObjectDatum, ObjectDatumOutput
 
 
-class DummyComponent(Component):
-    name: str = "dummy_component"
-    labels: tuple[str] = {ComponentTags.IMPORTER}
-
-    input_slots: tuple[SlotDefinition] = (
-        SlotDefinition(
-            name="in",
-            required=False,
-            multiple=False,
-            type=SlotDefinition.type.OBJECT,
-        ),
+@command_component(
+        name="dummy_component",
+        version="1.0",
+        description="A test command component",
+        labels=(ComponentTags.IMPORTER, ),
     )
-
-    output_slots: tuple[SlotDefinition] = (
-        SlotDefinition(
-            name="out",
-            required=False,
-            multiple=False,
-            type=SlotDefinition.type.OBJECT,
-        ),
-    )
-
-    def run(self):
-        in_data: ObjectDatum = self.input_data[0]
-        out_data: ObjectDatum = self.output_data[0]
-
-        if in_data is not None and out_data is not None:
-            out_data.set_object(out_data.get_object())
+def run(in_data: ObjectDatum=None, out_data: ObjectDatumOutput=None):
+    if in_data is not None and out_data is not None:
+        out_data.set_object(out_data.get_object())
 
 
 @pytest.fixture(scope="session")
 def dummy_component():
-    # Todo: Fix
-    return None
+    return run.component
 
 
 @pytest.fixture(scope="session")

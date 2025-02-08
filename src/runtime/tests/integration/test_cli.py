@@ -2,12 +2,10 @@ import pickle
 import sys
 from unittest.mock import patch
 
-from catalog import catalog
-from runtime.communication import SimpleCliCommunicationBackend
-from runtime.runtimes import Runtime
 import pytest
 
-
+from runtime.communication import SimpleCliCommunicationBackend
+from runtime.runtimes import Runtime
 
 
 @pytest.fixture(scope="session")

@@ -1,15 +1,15 @@
 import abc
+import argparse
 import sys
 from enum import StrEnum
 from pathlib import Path
 from typing import override
-import argparse
 
 from pydantic import BaseModel, Field, SerializeAsAny
 
 from runtime.command_line import kv_pairs, parse_kv_pairs
 from runtime.component_definition import JobDefinition, TaskDefinition
-from runtime.persistance import UnspecifiedDatum, DatumDefinition
+from runtime.persistance import DatumDefinition
 
 
 # There is a lot of redundancy having to declare a new command on the enum,

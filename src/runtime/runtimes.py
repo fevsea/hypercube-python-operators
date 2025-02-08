@@ -76,7 +76,7 @@ class Runtime:
 
     def _build_component(self, task: TaskDefinition) -> Component:
         """Converts a task definition into an executable component."""
-        component_class = self.catalog.get_component_for_task(task)
+        component = self.catalog.get_component_for_task(task)
         options = component_class.Options.model_validate(task.options)
 
         # TODO: Try to cast datum
