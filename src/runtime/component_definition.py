@@ -64,13 +64,6 @@ class ComponentTags(StrEnum):
     TIMESERIES = "timeseries"
 
 
-class IoType(StrEnum):
-    FILE = "file"
-    FOLDER = "folder"
-    DATAFRAME = "dataframe"
-    OBJECT = "object"
-
-
 @dataclass
 class SlotDefinition:
     """Describes an input/output slot.
@@ -82,7 +75,7 @@ class SlotDefinition:
     description: str = ""
     required: bool = True
     multiple: bool = False
-    type: IoType = IoType.FOLDER
+    type: DatumDefinition.Type = DatumDefinition.Type.FOLDER
 
 
 @dataclass
@@ -153,7 +146,7 @@ class Component:
         # Describes the specific I/O shape of the Component.
         self.input_slots: dict[str, SlotDefinition] = input_slots or {}
         self.output_slots: dict[str, SlotDefinition] = output_slots or {}
-        self.available_options: dict[str, OptionTypes] = options or {}
+        self.available_options: dict[str, OptionDefinition] = options or {}
 
         # Calling ingo
         self.runnable: Callable = runnable
@@ -219,17 +212,6 @@ class Component:
 
 
 @dataclass
-class InoutType:
-    """Type used with the command_component decorator to denote the type of parameter."""
-
-    description: str = ""
-    name: str = None
-    required: bool = True
-    multiple: bool = False
-    type: IoType = IoType.FOLDER
-
-
-@dataclass
 class Option:
     """Represents an option parameter for a component function."""
 
@@ -242,50 +224,68 @@ class Option:
     enum: None | list[str] = None
 
 
-def decode_param(param_name: str, param: Parameter, annotation) ->dict[str, Any]:
+def get_real_type(param) -> (type, tuple):
+    """Navigate the possibly nested hierarchy of Aliasses and annotations"""
+    if param is None:
+        return tuple(), None
+    metadata = tuple()
+    if hasattr(param, "__metadata__"):
+        metadata = param.__metadata__ or tuple()
+    if isinstance(param, _AnnotatedAlias):
+        new_metadata, param_type = get_real_type(param.__origin__)
+        return metadata + new_metadata, param_type
+    elif isinstance(param, TypeAliasType):
+        return get_real_type(param.__value__)
+    return metadata, param
+
+
+def decode_param(param_name: str, param: Parameter, annotation) -> dict[str, Any]:
     """Read the metadata associated with the parmeter as well as it's type"""
 
-
-    if isinstance(annotation, TypeAliasType):
-        annotation = annotation.__value__
-
-    annotation_type = annotation
-
-    annotation_metadata = {}
-
-    if isinstance(annotation, _AnnotatedAlias):
-        annotation_type = annotation.__origin__
-        annotation_metadata = annotation.__metadata__
+    annotation_metadata, annotation_type = get_real_type(annotation)
 
     decoded = {
         "type": annotation_type,
         "name": param_name,
+        "required": param.default == param.empty,
     }
 
-
+    if not decoded["required"]:
+        decoded["default"] = param.default
 
     for item in annotation_metadata:
-        if item is str:
+        if isinstance(item, str):
             decoded[item] = True
             continue
         if hasattr(item, "gt"):
             if "min" in decoded:
-                raise RuntimeError(f"Annotation for {param_name} param already has a min value")
+                raise RuntimeError(
+                    f"Annotation for {param_name} param already has a min value"
+                )
             decoded["min"] = item.gt
         if hasattr(item, "ge"):
             if "min" in decoded:
-                raise RuntimeError(f"Annotation for {param_name} param already has a min value")
+                raise RuntimeError(
+                    f"Annotation for {param_name} param already has a min value"
+                )
             decoded["min"] = item.ge
         if hasattr(item, "lt"):
-            if "min" in decoded:
-                raise RuntimeError(f"Annotation for {param_name} param already has a max value")
-            decoded["min"] = item.lt
+            if "max" in decoded:
+                raise RuntimeError(
+                    f"Annotation for {param_name} param already has a max value"
+                )
+            decoded["max"] = item.lt
         if hasattr(item, "le"):
             if "max" in decoded:
-                raise RuntimeError(f"Annotation for {param_name} param already has a max value")
+                raise RuntimeError(
+                    f"Annotation for {param_name} param already has a max value"
+                )
             decoded["max"] = item.le
+        if hasattr(item, "documentation"):
+            decoded["description"] = item.documentation
 
     return decoded
+
 
 def command_component(
     name: str,
@@ -319,68 +319,52 @@ def command_component(
 
         # Parse the function arguments using its annotations
         for param_name, param in signature.parameters.items():
-            decoded_param = decode_param(param_name, param, annotations.get(param_name, None))
-            if param_name in annotations:
-                annotation = annotations[param_name]
-                annotation_type = annotation
-                annotation_metadata = {}
-                if isinstance(annotation, TypeAliasType):
-                    annotation = annotation.__value__
-                if isinstance(annotation, _AnnotatedAlias):
-                    annotation_type = annotation.__origin__
-                    annotation_metadata = annotation.__metadata__
-
-                if isinstance(annotation, OptionDefinition):
-                    metadata["options"][param_name] = OptionDefinition(
-                        name=param_name,
-                        description=annotation.description,
-                        default=param.default,
-                        required=annotation.required,
-                        min=annotation.min,
-                        max=annotation.max,
-                        enum=annotation.enum,
-                        type=OptionDefinition.Types.from_type(annotation.type),
-                    )
-                elif "input" in annotation_metadata:
+            decoded_param = decode_param(
+                param_name, param, annotations.get(param_name, None)
+            )
+            if decoded_param["type"] is not None and issubclass(
+                decoded_param["type"], Datum
+            ):
+                if "input" in decoded_param:
                     metadata["input_slots"][param_name] = SlotDefinition(
-                        name=param_name,
-                        description=annotation.description,
-                        required=annotation.required,
-                        multiple=annotation.multiple,
-                        type=annotation.type,
-                    )
-                elif isinstance(annotation, Datum) or "output" in annotation_metadata:
-                    metadata["output_slots"][param_name] = SlotDefinition(
-                        name=param_name,
-                        description=annotation.description,
-                        required=annotation.required,
-                        multiple=annotation.multiple,
-                        type=annotation.type,
-                    )
-                elif annotation == Context:
-                    metadata["context_varname"] = param_name
-                elif annotation in (str, int, float, bool, datetime):
-                    metadata["options"][param_name] = OptionDefinition(
-                        name=param_name,
-                        default=param.default,
-                        required=param.default is None,
-                        min=None,
-                        max=None,
-                        enum=None,
-                        type=OptionDefinition.Types.from_type(annotation),
+                        name=decoded_param.get("name"),
+                        description=decoded_param.get("description", ""),
+                        required=decoded_param["required"],
+                        multiple=False,
+                        type=decoded_param["type"].io_type,
                     )
                 else:
-                    raise ValueError(
-                        f"Parameter {param_name} in the function signature has an unsupported annotation: {annotation}"
+                    metadata["output_slots"][param_name] = SlotDefinition(
+                        name=decoded_param["name"],
+                        description=decoded_param.get("description", ""),
+                        required=decoded_param["required"],
+                        multiple=False,
+                        type=decoded_param["type"].io_type,
                     )
+            elif decoded_param["type"] == Context:
+                metadata["context_varname"] = param_name
+            elif decoded_param["type"] in (str, int, float, bool, datetime):
+                metadata["options"][param_name] = OptionDefinition(
+                    name=decoded_param["name"],
+                    default=decoded_param.get("default", None),
+                    description=decoded_param.get("description", ""),
+                    required=decoded_param["required"],
+                    min=decoded_param.get("min", None),
+                    max=decoded_param.get("max", None),
+                    enum=None,
+                    type=OptionDefinition.Types.from_type(decoded_param["type"]),
+                )
+            elif decoded_param.get("type", None) is None and decoded_param["name"] in (
+                "context",
+                "ctx",
+            ):
+                metadata["context_varname"] = param_name
             else:
-                if param_name in ("context", "ctx"):
-                    metadata["context_varname"] = param_name
                 raise ValueError(
-                    f"Parameter {param_name} in the function signature is missing an annotation."
+                    f"Parameter {param_name} in the function signature has an unsupported annotation: {decoded_param}"
                 )
 
-        #if isinstance(arg, (annotated_types.BaseMetadata)
+        # if isinstance(arg, (annotated_types.BaseMetadata)
 
         @functools.wraps(func)
         def wrapped_function(*args, **kwargs):

@@ -38,6 +38,8 @@ class Datum:
     Only this class can be actually persisted and retrieved from the disk. Other classes are just wrappers.
     """
 
+    io_type: DatumDefinition.Type = DatumDefinition.Type.NOT_YET_KNOWN
+
     def __init__(self, datum_definition: DatumDefinition):
         """Only uncommitted data can be modified."""
         self._definition = datum_definition
@@ -77,6 +79,8 @@ type FolderDatumOutput = Annotated[FolderDatum, "output"]
 class FolderDatum(Datum):
     """Represents a folder on disk."""
 
+    io_type: DatumDefinition.Type = DatumDefinition.Type.FOLDER
+
     def get_path(self) -> Path:
         return self._definition.path
 
@@ -91,6 +95,8 @@ class UnspecifiedDatum(Datum):
     Usually acts as a placeholder to indicate where a real datum should be saved.
     In order to do anything meaningful with this datum it must be promoted to another type.
     """
+
+    io_type: DatumDefinition.Type = DatumDefinition.Type.NOT_YET_KNOWN
 
     def promote(self, new_type: DatumDefinition.Type):
         """Cast to one of the subclasses of Datum."""
@@ -112,6 +118,8 @@ class FileDatum(Datum):
 
     We don't offer the full path to make sure the data is always opened as read-only.
     """
+
+    io_type: DatumDefinition.Type = DatumDefinition.Type.FILE
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -160,6 +168,8 @@ type DataFrameDatumOutput = Annotated[DataFrameDatum, "output"]
 class DataFrameDatum(FileDatum):
     """Represents a dataframe on disk. It is a special case of FileDatum provided for convenience."""
 
+    io_type: DatumDefinition.Type = DatumDefinition.Type.DATAFRAME
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._df = None
@@ -184,6 +194,8 @@ class ObjectDatum(FileDatum):
 
     Known formats are pickle, json, toml, and yaml.
     """
+
+    io_type: DatumDefinition.Type = DatumDefinition.Type.OBJECT
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -225,6 +237,8 @@ class DatumFactory(Datum):
 
     The datum definition acts as a template to create multiple ones.
     """
+
+    io_type: DatumDefinition.Type = DatumDefinition.Type.NOT_YET_KNOWN
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -6,7 +6,6 @@ from runtime.component_definition import (
     Component,
     ComponentTags,
     SlotDefinition,
-    IoType,
 )
 from runtime.persistance import ObjectDatum
 
@@ -20,7 +19,7 @@ class DummyComponent(Component):
             name="in",
             required=False,
             multiple=False,
-            type=IoType.OBJECT,
+            type=SlotDefinition.type.OBJECT,
         ),
     )
 
@@ -29,7 +28,7 @@ class DummyComponent(Component):
             name="out",
             required=False,
             multiple=False,
-            type=IoType.OBJECT,
+            type=SlotDefinition.type.OBJECT,
         ),
     )
 
