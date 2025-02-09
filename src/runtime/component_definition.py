@@ -17,7 +17,7 @@ from typing import (
 from pydantic import BaseModel, Field
 
 from runtime.context import Context
-from runtime.persistance import Datum, DatumDefinition
+from runtime.persistance import Datum, DatumDefinition, UnspecifiedDatum, DatumFactory
 
 
 class TaskDefinition(BaseModel):
@@ -76,6 +76,9 @@ class SlotDefinition:
     type: DatumDefinition.Type = DatumDefinition.Type.FOLDER
 
 
+type OptionTypes = str | int | float | bool
+
+
 @dataclass
 class OptionDefinition:
     """Describes an option parameter."""
@@ -107,6 +110,32 @@ class OptionDefinition:
             else:
                 raise ValueError(f"Unknown type: {python_type}")
 
+        @classmethod
+        def cast_if_needed(
+            cls, target_type: "OptionDefinition.Types", value: OptionTypes
+        ):
+            """Will try to cast between integer and float if possible. Any other cast results on an error."""
+            value_type = cls.from_type(type(value))
+            if target_type == value_type:
+                return value
+
+            if (
+                target_type == cls.INTEGER
+                and value_type == cls.FLOAT
+                and int(value) == value
+            ):
+                return int(value)
+            elif (
+                target_type == cls.FLOAT
+                and value_type == cls.INTEGER
+                and float(value) == value
+            ):
+                return float(value)
+            else:
+                raise ValueError(
+                    f"Cannot cast '{value}' from '{value_type}' type  to '{target_type}' type."
+                )
+
     name: str
     description: str = ""
     type: Types = Types.STRING
@@ -115,9 +144,6 @@ class OptionDefinition:
     min: None | int | float = None
     max: None | int | float = None
     enum: None | list[str] = None
-
-
-type OptionTypes = str | int | float | bool
 
 
 class Component:
@@ -153,47 +179,107 @@ class Component:
     def run(
         self,
         context: Context,
-        input_data: dict[str, Datum | None | list[Datum]],
-        output_data: dict[str, Datum | None | list[Datum]],
+        input_data: dict[str, Datum | None | list[Datum]] = None,
+        output_data: dict[str, Datum | None | list[Datum]] = None,
         options: dict[str, OptionTypes] = None,
     ):
-        """Actually executes the component with specific data."""
-        # An instance is tied to actual data and parameters
-        # Todo: Rewrite validation
-        input_data = self._validate_slots(input_data, self.input_slots)
-        output_data = self._validate_slots(output_data, self.output_slots)
-        options = options or dict()
-        context = context
+        """Actually executes the component with specific data.
 
-        params = {**options, **input_data, **output_data}
+        This is where most of the checks should happen, as it's only invoked on the operation we want to run.
+        """
+
+        # Check constraints, try to cast values, and handle optional parameters
+        input_data = self._validate_inputs(input_data)
+        output_data = self._validate_outputs(output_data)
+        options = self._validate_options(options)
+
+        params = {**input_data, **output_data, **options}
         if self.context_varname is not None:
             params[self.context_varname] = context
-
         self.runnable(**params)
 
     @staticmethod
-    def _validate_slots(
-        datums: dict[str, Datum],
-        slots: dict[str, SlotDefinition],
-    ):
-        if len(slots) != len(datums):
-            # The zip validation below requires this invariant
-            raise ValueError(
-                f"The number of input slots ({len(datums)}) does not match the number of required input slots ({len(slots)})"
-            )
+    def _validate(category: str, provided, expected, additional_validator: callable):
+        provided = provided or {}
+        cleaned = {}
 
-        for slot, datum in zip(slots, datums):
-            if slot.required and datum is None:
-                raise ValueError(f"Slot {slot.name} is required but not provided.")
-            if slot.type != datum.get_type():
-                raise ValueError(
-                    f"Slot {slot.name} is of type {slot.type} but the provided datum is of type {datum.get_type()}"
+        for name, definition in expected.items():
+            if name not in provided:
+                if definition.required:
+                    raise ValueError(
+                        f"{category} '{name}' is required but not provided."
+                    )
+                else:
+                    cleaned[name] = definition.default
+            else:
+                value = provided[name]
+                value = additional_validator(name, value, definition)
+                cleaned[name] = value
+
+        for name in provided.keys():
+            if name not in expected:
+                raise Warning(
+                    f"{category} '{name}' is not available for this component."
                 )
-        # The content of list datum is not validated
-        return datums
+        return cleaned
 
-    def run(self) -> tuple[Datum]:
-        pass
+    def _validate_options(
+        self, options: dict[str, OptionTypes] | None
+    ) -> dict[str, OptionTypes]:
+        """Make sure types are correct and within constraints. Adds options not present with defaults."""
+
+        def extra_validation(name, value, definition):
+            if definition.min is not None and value < definition.min:
+                raise ValueError(f"Option '{name}' is too small.")
+            if definition.max is not None and value > definition.max:
+                raise ValueError(f"Option '{name}' is too big.")
+            return OptionDefinition.Types.cast_if_needed(definition.type, value)
+
+        return self._validate(
+            "Option", options, self.available_options, extra_validation
+        )
+
+    def _validate_inputs(self, datums: dict[str, Datum]):
+
+        def extra_validation(name, value, definition):
+            if not isinstance(value, Iterable):
+                # Temporally transform into list
+                value = [value]
+            casted_values = []  # Needed because we modify the list while iterating it
+            for item in value:
+                if item.io_type != definition.type:
+                    if isinstance(item, UnspecifiedDatum):
+                        item = item.promote(definition.type)
+                    else:
+                        raise ValueError(
+                            f"Input '{name}' is of type '{item.io_type}' but should be '{definition.type}'."
+                        )
+                casted_values.append(item)
+            if not definition.multiple:
+                if len(casted_values) > 1:
+                    raise ValueError(
+                        f"Input '{name}' is marked as single but has multiple values."
+                    )
+                else:
+                    casted_values = casted_values[0]
+            return casted_values
+
+        return self._validate("Input", datums, self.input_slots, extra_validation)
+
+    def _validate_outputs(self, datums: dict[str, Datum]):
+
+        def extra_validation(name, value, definition):
+            if value.io_type != definition.type:
+                raise ValueError(
+                    f"Output '{name}' is of type '{value.io_type}' but should be '{definition.type}'."
+                )
+            if definition.multiple and not isinstance(value, DatumFactory):
+                raise ValueError(
+                    f"Output '{name}' is marked as multiple but is not a DatumFactory."
+                )
+            return value
+
+        return self._validate("Output", datums, self.output_slots, extra_validation)
 
     def get_human_name(self):
         """Return a human-readable name for the component."""

@@ -238,8 +238,10 @@ class DatumFactory(Datum):
     The datum definition acts as a template to create multiple ones.
     """
 
+    # This is overridden by the inner instance
     io_type: DatumDefinition.Type = DatumDefinition.Type.NOT_YET_KNOWN
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._object = None
+        self.generated_datums = []
+        self.io_type = self._definition.type

@@ -20,8 +20,8 @@ class TaskDefinition(BaseModel):
     version: str
 
     arguments: dict = Field(default_factory=dict)  # noqa: intellij bug
-    input_data: list[DatumDefinition | None | list[DatumDefinition]] = Field(
-        default_factory=list
+    input_data: dict[str, DatumDefinition | None | list[DatumDefinition]] = Field(
+        default_factory=dict
     )  # noqa: intellij bug
 
 
@@ -76,23 +76,24 @@ class Runtime:
 
     def _build_component(self, task: TaskDefinition) -> Component:
         """Converts a task definition into an executable component."""
-        component = self.catalog.get_component_for_task(task)
-        options = component_class.Options.model_validate(task.options)
+        component: Component = self.catalog.get_component_for_task(task)
 
-        # TODO: Try to cast datum
-        input_data = tuple(
-            self._get_datum(datum_definition) for datum_definition in task.input_data
-        )
-        output_data = tuple(
-            self._get_datum(datum_definition) for datum_definition in task.output_data
-        )
+        input_data = {
+            name: self._get_datum(datum_definition)
+            for name, datum_definition in task.input_data.items()
+        }
+        # Todo: Output data on task definition does not actually exists
+        output_data = {
+            name: self._get_datum(datum_definition)
+            for name, datum_definition in task.output_data.items()
+        }
         context = self._build_context_for_class(task)
 
-        return component_class(
+        return component.run(
             context=context,
             input_data=input_data,
             output_data=output_data,
-            options=options,
+            options=task.options,
         )
 
     def _build_context_for_class(self, task: TaskDefinition):
