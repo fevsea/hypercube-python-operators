@@ -7,8 +7,9 @@ from typing import override
 
 from pydantic import BaseModel, Field, SerializeAsAny
 
+from runtime.catalog_base import Catalog
 from runtime.command_line import kv_pairs, parse_kv_pairs
-from runtime.component_definition import JobDefinition, TaskDefinition
+from runtime.component_definition import JobDefinition, TaskDefinition, Component, SlotDefinition
 from runtime.persistance import DatumDefinition
 
 
@@ -99,10 +100,12 @@ class SimpleCliCommunicationBackend(CommunicationBackend):
     It is intended to run a single task. If the runtime tries to do more it will fail.
     """
 
-    def __init__(self):
+    def __init__(self, catalog: Catalog):
         self.args = self._parse_args(sys.argv[1:])
+        self.catalog: Catalog = catalog
         self.job = self._parse_job()
         self.job_completed = False
+
 
     def _send_message(self, message: Message) -> Message:
         """Simulate responses based on the job definition.
@@ -200,23 +203,45 @@ class SimpleCliCommunicationBackend(CommunicationBackend):
         return args
 
     @staticmethod
-    def _add_datum(datums: list, path: Path):
-        if path is not None:
-            datum = DatumDefinition(path=path)
-            datums.append(datum)
-        return datums
+    def _find_first_valid(definitions: dict[str, SlotDefinition])-> SlotDefinition | None:
+        """Returns the first required DatumDefinition. If unable the first one. If unable error.
+        """
+        first = None
+        for definition in definitions.values():
+            if first is None:
+                first = definition
+            if definition.required:
+                return definition
+        if first is None:
+            raise RuntimeError("No datum expected, yet one was provided.")
+        return first
+
+    @staticmethod
+    def _infer_datums(path, slots: dict[str, SlotDefinition]):
+        if path is None:
+            return {}
+        else:
+            slot_definition = SimpleCliCommunicationBackend._find_first_valid(slots)
+            datum_definition = DatumDefinition(path=path)
+            return {slot_definition.name: datum_definition}
+
+
 
     def _parse_job(self):
         if self.args.file is not None:
             return JobDefinition.model_validate_file(self.args.file)
 
         # Reconstruct task from args
+        component: Component = self.catalog.get_component(self.args.component)
+        input_data = self._infer_datums(self.args.input, component.input_slots)
+        output_data = self._infer_datums(self.args.output, component.output_slots)
+
         task = TaskDefinition(
-            name=self.args.component,
+            component=self.args.component,
             library="",
             options=self.args.argument,
-            input_data=self._add_datum([], self.args.input),
-            output_data=self._add_datum([], self.args.output),
+            input_data=input_data,
+            output_data=output_data,
         )
 
         return JobDefinition(tasks=[task])

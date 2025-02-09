@@ -27,13 +27,13 @@ class TaskDefinition(BaseModel):
     """
 
     # Component info
-    name: str
+    component: str
     library: str = "local"
 
     # Parameters
     options: dict[str, Any] = Field(default_factory=list)
-    input_data: list[DatumDefinition] = Field(default_factory=list)
-    output_data: list[DatumDefinition] = Field(default_factory=list)
+    input_data: dict[str, DatumDefinition] = Field(default_factory=dict)
+    output_data: dict[str, DatumDefinition] = Field(default_factory=dict)
 
 
 class JobDefinition(BaseModel):

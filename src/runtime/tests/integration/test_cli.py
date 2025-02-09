@@ -35,6 +35,6 @@ def test_cli_catalog(input_datum, tmp_path, dummy_catalog):
             str(tmp_path),
         ],
     ):
-        communication_backend = SimpleCliCommunicationBackend()
+        communication_backend = SimpleCliCommunicationBackend(dummy_catalog)
         cli_runtime = Runtime(dummy_catalog, communication_backend)
         cli_runtime.start()

@@ -1,29 +1,13 @@
 import logging
+from functools import partial
 
 from pydantic import BaseModel, Field
 
 from runtime.catalog_base import Catalog
 from runtime.communication import CommunicationBackend
-from runtime.component_definition import JobDefinition, Component
+from runtime.component_definition import JobDefinition, TaskDefinition
 from runtime.context import Context
 from runtime.persistance import DatumDefinition, Datum
-
-
-class TaskDefinition(BaseModel):
-    """Describes a task that can be executed by the runtime."""
-
-    class Config:
-        extra = "allow"
-
-    library: str
-    component: str
-    version: str
-
-    arguments: dict = Field(default_factory=dict)  # noqa: intellij bug
-    input_data: dict[str, DatumDefinition | None | list[DatumDefinition]] = Field(
-        default_factory=dict
-    )  # noqa: intellij bug
-
 
 class Runtime:
     """Handles the execution of jobs assigned by the cubelet."""
@@ -50,8 +34,14 @@ class Runtime:
             self.run_task(task)
 
     def run_task(self, task: TaskDefinition):
-        component = self._build_component(task)
-        result = component.run()
+        component = self.catalog.get_component(task.component, task.library)
+        input_data = self._get_datums(task.input_data)
+        options = task.options
+        context = self._build_context_for_task(task)
+        result = component.run(context=context, input_data=input_data, output_data=None, options=options)
+        self.logger.info(
+            f"Task {task.name} finished with result: {result}"
+        )
         self.communication_backend.commit_datum(result)
 
     def _get_datum(
@@ -74,27 +64,13 @@ class Runtime:
 
         return self.datum_cache[datum_definition.hash]
 
-    def _build_component(self, task: TaskDefinition) -> Component:
-        """Converts a task definition into an executable component."""
-        component: Component = self.catalog.get_component_for_task(task)
-
-        input_data = {
+    def _get_datums(self, datums_definitions: dict[str, DatumDefinition]) -> dict[str, Datum | list[Datum]]:
+        """Converts dict of DatumDefinitions into datums."""
+        return {
             name: self._get_datum(datum_definition)
-            for name, datum_definition in task.input_data.items()
+            for name, datum_definition in datums_definitions.items()
         }
-        # Todo: Output data on task definition does not actually exists
-        output_data = {
-            name: self._get_datum(datum_definition)
-            for name, datum_definition in task.output_data.items()
-        }
-        context = self._build_context_for_class(task)
 
-        return component.run(
-            context=context,
-            input_data=input_data,
-            output_data=output_data,
-            options=task.options,
-        )
 
-    def _build_context_for_class(self, task: TaskDefinition):
+    def _build_context_for_task(self, task: TaskDefinition):
         return Context(self, task)

@@ -5,7 +5,7 @@ from runtime.component_definition import (
     ComponentTags,
     command_component,
 )
-from runtime.persistance import ObjectDatum, ObjectDatumOutput
+from runtime.persistance import ObjectDatum, ObjectDatumOutput, ObjectDatumInput
 
 
 @command_component(
@@ -14,7 +14,7 @@ from runtime.persistance import ObjectDatum, ObjectDatumOutput
         description="A test command component",
         labels=(ComponentTags.IMPORTER, ),
     )
-def run(in_data: ObjectDatum=None, out_data: ObjectDatumOutput=None):
+def run(in_data: ObjectDatumInput=None, out_data: ObjectDatumOutput=None):
     if in_data is not None and out_data is not None:
         out_data.set_object(out_data.get_object())
 

@@ -23,12 +23,17 @@ class Catalog:
             component.name.lower(): component for component in components
         }
 
-    def get_component_for_task(self, task: TaskDefinition) -> Component:
-        if task.library.lower() != self.name.lower():
+    def get_component(self, name: str, library: str | None = "") -> Component:
+        """
+        Retrieve a specific component from the current task.
+
+        If the library parameter is None, it is not check
+        """
+        if library is not None and library.lower() != self.name.lower():
             raise ValueError(
-                f"The task uses a component from another library '{task.library}'"
+                f"The task uses a component from another library '{library}'"
             )
-        cpn_name = task.name.lower()
+        cpn_name = name.lower()
         if cpn_name not in self.components:
-            raise ValueError(f"The task uses an unknown component '{task.name}'")
+            raise ValueError(f"The task uses an unknown component '{name}'")
         return self.components[cpn_name.lower()]
