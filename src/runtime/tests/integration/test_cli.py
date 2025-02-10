@@ -11,7 +11,7 @@ from runtime.runtimes import Runtime
 @pytest.fixture(scope="session")
 def input_datum(tmp_path_factory):
     folder_path = tmp_path_factory.mktemp("input_datum")
-    fn_path = folder_path / "data.pkl"
+    fn_path = folder_path / "object.pkl"
     with open(fn_path, "wb") as file:
         pickle.dump("Hello", file)
 
@@ -38,3 +38,8 @@ def test_cli_catalog(input_datum, tmp_path, dummy_catalog):
         communication_backend = SimpleCliCommunicationBackend(dummy_catalog)
         cli_runtime = Runtime(dummy_catalog, communication_backend)
         cli_runtime.start()
+
+        out_file = tmp_path / "object.pkl"
+        assert out_file.exists()
+        with open(out_file, "rb") as file:
+            assert pickle.load(file) == "Hello"

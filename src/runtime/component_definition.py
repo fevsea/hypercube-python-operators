@@ -210,7 +210,8 @@ class Component:
                         f"{category} '{name}' is required but not provided."
                     )
                 else:
-                    cleaned[name] = definition.default
+                    if hasattr(definition, "default"):
+                        cleaned[name] = definition.default
             else:
                 value = provided[name]
                 value = additional_validator(name, value, definition)
