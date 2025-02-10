@@ -45,6 +45,9 @@ class Datum:
         self._definition = datum_definition
         self._committed = False
 
+    def get_definition(self) -> DatumDefinition:
+        return self._definition
+
     def get_type(self) -> DatumDefinition.Type:
         return self._definition.type
 
@@ -243,5 +246,5 @@ class DatumFactory(Datum):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.generated_datums = []
+        self.generated_datums: list[Datum] = []
         self.io_type = self._definition.type

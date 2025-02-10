@@ -38,3 +38,4 @@ def test_cli_catalog(input_datum, tmp_path, dummy_catalog):
         communication_backend = SimpleCliCommunicationBackend(dummy_catalog)
         cli_runtime = Runtime(dummy_catalog, communication_backend)
         cli_runtime.start()
+        # Todo: Actually persist datum and check result

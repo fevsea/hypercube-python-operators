@@ -115,7 +115,9 @@ class SimpleCliCommunicationBackend(CommunicationBackend):
         match message.command:
             case CommandName.GET_JOB:
                 if self.job is not None:
-                    return Message(command=CommandName.JOB_DEFINITION, data=self.job)
+                    message = Message(command=CommandName.JOB_DEFINITION, data=self.job)
+                    self.job = None
+                    return message
                 else:
                     return Message(command=CommandName.STOP)
             case CommandName.JOB_FINISHED:
@@ -222,7 +224,7 @@ class SimpleCliCommunicationBackend(CommunicationBackend):
             return {}
         else:
             slot_definition = SimpleCliCommunicationBackend._find_first_valid(slots)
-            datum_definition = DatumDefinition(path=path)
+            datum_definition = DatumDefinition(path=path, type=slot_definition.type)
             return {slot_definition.name: datum_definition}
 
 

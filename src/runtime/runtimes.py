@@ -7,7 +7,8 @@ from runtime.catalog_base import Catalog
 from runtime.communication import CommunicationBackend
 from runtime.component_definition import JobDefinition, TaskDefinition
 from runtime.context import Context
-from runtime.persistance import DatumDefinition, Datum
+from runtime.persistance import DatumDefinition, Datum, DatumFactory
+
 
 class Runtime:
     """Handles the execution of jobs assigned by the cubelet."""
@@ -36,13 +37,14 @@ class Runtime:
     def run_task(self, task: TaskDefinition):
         component = self.catalog.get_component(task.component, task.library)
         input_data = self._get_datums(task.input_data)
+        output_data = self._get_datums(task.output_data)
         options = task.options
         context = self._build_context_for_task(task)
-        result = component.run(context=context, input_data=input_data, output_data=None, options=options)
+        result = component.run(context=context, input_data=input_data, output_data=output_data, options=options)
         self.logger.info(
-            f"Task {task.name} finished with result: {result}"
+            f"Task {task.component} finished with result: {result}"
         )
-        self.communication_backend.commit_datum(result)
+        self.commit_datums(output_data.values())
 
     def _get_datum(
         self, datum_definition: DatumDefinition | None | list[DatumDefinition]
@@ -74,3 +76,10 @@ class Runtime:
 
     def _build_context_for_task(self, task: TaskDefinition):
         return Context(self, task)
+
+    def commit_datums(self, datums: list[Datum]):
+        for datum in datums:
+            if isinstance(datum, DatumFactory):
+                self.commit_datums(datum.generated_datums)
+            else:
+                self.communication_backend.commit_datum(datum.get_definition())
