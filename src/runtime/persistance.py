@@ -1,3 +1,4 @@
+import abc
 import json
 import pickle
 import tomllib
@@ -7,6 +8,7 @@ from pathlib import Path
 from typing import BinaryIO, TextIO, override, Annotated
 
 import pandas as pd
+import tomlkit
 import yaml
 from pydantic import BaseModel, Field
 
@@ -55,9 +57,6 @@ class Datum:
     def is_committed(self) -> bool:
         return self._committed
 
-    def commit(self):
-        self._committed = True
-
     @classmethod
     def from_definition(cls, datum_definition: DatumDefinition) -> "Datum":
         """Creates the appropriate class for the given type"""
@@ -87,6 +86,9 @@ class FolderDatum(Datum):
 
     def get_path(self) -> Path:
         return self._definition.path
+
+    def commit_folder(self):
+        self._committed = True
 
 
 type UnspecifiedDatumInput = Annotated[UnspecifiedDatum, "input"]
@@ -164,6 +166,10 @@ class FileDatum(Datum):
         else:
             return files[0].name
 
+    def commit_file(self):
+        """Marks the file as committed."""
+        self._committed = True
+
 
 type DataFrameDatumInput = Annotated[DataFrameDatum, "input"]
 type DataFrameDatumOutput = Annotated[DataFrameDatum, "output"]
@@ -184,9 +190,20 @@ class DataFrameDatum(FileDatum):
             self._df = pd.read_parquet(self.open_binary())
         return self._df
 
+    def set_df(self, df):
+        if self._committed or self._df is not None:
+            raise RuntimeError("Cannot modify data of an already committed datum.")
+        self._df = df
+        self._save_df()
+
     def clear(self):
         """Remove the dataframe from memory."""
         self._df = None
+
+    def _save_df(self):
+        filename = f"df.parquet"
+        file_path = self._definition.path / filename
+        self._df.to_parquet(file_path)
 
 
 type ObjectDatumInput = Annotated[ObjectDatum, "input"]
@@ -204,13 +221,14 @@ class ObjectDatum(FileDatum):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._object = None
+        self.extension = "pkl"
 
     def get_object(self):
         """Returns the loaded object."""
         if self._object is None:
             ext = self.filename.split(".")[-1].lower()
             with self.open_binary() as file:
-                if ext == "pickle":
+                if ext in ("pkl", "pickle"):
                     self._object = pickle.load(file)
                 elif ext == "json":
                     self._object = json.load(file)
@@ -220,7 +238,9 @@ class ObjectDatum(FileDatum):
                     self._object = tomllib.load(file)
                 else:
                     # Ideally, we shouldn't reach this point
+                    ext = "pkl"
                     self._object = pickle.load(file)
+            self.extension = ext
         return self._object
 
     def clear(self):
@@ -231,6 +251,25 @@ class ObjectDatum(FileDatum):
         if self._committed:
             raise RuntimeError("Cannot modify data of an already committed datum.")
         self._object = data
+        self._save_object()
+
+    def _save_object(self):
+        """Saves the object into disk. Supported formats are pickle, json, toml, and yaml."""
+        filename = f"object.{self.extension}"
+        file_path = self._definition.path / filename
+
+        with file_path.open("wb" if self.extension == "pkl" else "w") as file:
+            if self.extension in "pkl":
+                pickle.dump(self._object, file)
+            elif self.extension == "json":
+                json.dump(self._object, file)
+            elif self.extension in ("yaml", "yml"):
+                yaml.safe_dump(self._object, file)
+            elif self.extension == "toml":
+                tomlkit.dump(self._object, file)
+            else:
+                raise ValueError(f"Unsupported file extension: {self.extension}")
+        self._committed = True
 
 
 type DatumFactoryOutput[T: Datum] = Annotated[DatumFactory[T: Datum], "output"]

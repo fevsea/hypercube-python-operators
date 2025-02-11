@@ -40,10 +40,13 @@ class Runtime:
         output_data = self._get_datums(task.output_data)
         options = task.options
         context = self._build_context_for_task(task)
-        result = component.run(context=context, input_data=input_data, output_data=output_data, options=options)
-        self.logger.info(
-            f"Task {task.component} finished with result: {result}"
+        result = component.run(
+            context=context,
+            input_data=input_data,
+            output_data=output_data,
+            options=options,
         )
+        self.logger.info(f"Task {task.component} finished with result: {result}")
         self.commit_datums(output_data.values())
 
     def _get_datum(
@@ -59,6 +62,9 @@ class Runtime:
         if type(datum_definition) is list:
             return [self._get_datum(datum) for datum in datum_definition]
 
+        if datum_definition.hash is None:
+            return Datum.datum_factory(datum_definition)
+
         if not datum_definition.hash in self.datum_cache:
             self.datum_cache[datum_definition.hash] = Datum.from_definition(
                 datum_definition
@@ -66,13 +72,14 @@ class Runtime:
 
         return self.datum_cache[datum_definition.hash]
 
-    def _get_datums(self, datums_definitions: dict[str, DatumDefinition]) -> dict[str, Datum | list[Datum]]:
+    def _get_datums(
+        self, datums_definitions: dict[str, DatumDefinition]
+    ) -> dict[str, Datum | list[Datum]]:
         """Converts dict of DatumDefinitions into datums."""
         return {
             name: self._get_datum(datum_definition)
             for name, datum_definition in datums_definitions.items()
         }
-
 
     def _build_context_for_task(self, task: TaskDefinition):
         return Context(self, task)
