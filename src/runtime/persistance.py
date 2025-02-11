@@ -1,6 +1,7 @@
 import json
 import pickle
 import tomllib
+import uuid
 from enum import StrEnum
 from pathlib import Path
 from typing import BinaryIO, TextIO, override, Annotated
@@ -58,7 +59,7 @@ class Datum:
         self._committed = True
 
     @classmethod
-    def datum_factory(cls, datum_definition: DatumDefinition) -> "Datum":
+    def from_definition(cls, datum_definition: DatumDefinition) -> "Datum":
         """Creates the appropriate class for the given type"""
         match datum_definition.type:
             case DatumDefinition.Type.FILE:
@@ -105,7 +106,7 @@ class UnspecifiedDatum(Datum):
         """Cast to one of the subclasses of Datum."""
         definition = self._definition.model_copy()
         definition.type = new_type
-        return Datum.datum_factory(self._definition)
+        return Datum.from_definition(self._definition)
 
     @override
     def get_type(self):
@@ -232,19 +233,28 @@ class ObjectDatum(FileDatum):
         self._object = data
 
 
-type DatumFactoryOutput = Annotated[DatumFactory, "output"]
-
-
-class DatumFactory(Datum):
+type DatumFactoryOutput[T: Datum] = Annotated[DatumFactory[T: Datum], "output"]
+class DatumFactory[T: Datum](Datum):
     """Special type of datums that allow for the creation of multiple datums.
 
     The datum definition acts as a template to create multiple ones.
     """
 
-    # This is overridden by the inner instance
+    # This is overridden on each instance
     io_type: DatumDefinition.Type = DatumDefinition.Type.NOT_YET_KNOWN
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.generated_datums: list[Datum] = []
+        self._generated_datums: list[Datum] = []
         self.io_type = self._definition.type
+
+    def create_datum(self) -> T:
+        new_definition = self._definition.model_copy()
+        new_definition.path = self._definition.path / uuid.uuid4().hex
+        new_datum = Datum.from_definition(new_definition)
+        self._generated_datums.append(new_datum)
+        return new_datum
+
+    def get_generated_datums(self) -> list[T]:
+        """Gets the generated datums with data."""
+        return [datum for datum in self._generated_datums if datum.is_committed()]

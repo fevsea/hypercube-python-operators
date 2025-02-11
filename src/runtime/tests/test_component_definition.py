@@ -10,7 +10,7 @@ from runtime.component_definition import (
     OptionDefinition,
 )
 from runtime.context import Context
-from runtime.persistance import FolderDatum, FolderDatumInput, FolderDatumOutput
+from runtime.persistance import FolderDatum, FolderDatumInput, FolderDatumOutput, ObjectDatum, DatumFactoryOutput
 
 
 def test_command_component_metadata():
@@ -107,6 +107,33 @@ def test_command_component_output():
     assert param1.type == SlotDefinition.type.FOLDER
     assert param1.required is True
     assert param1.multiple is False
+    assert param1.description == ""
+
+
+def test_command_component_multiple_output():
+    @command_component(
+        name="test_component",
+        version="1.0",
+        description="A test command component",
+        labels=["1.0"],
+    )
+    def test_func(
+        param1: Annotated[DatumFactoryOutput[ObjectDatum], Doc("A description")],
+    ):
+        pass
+
+    component: Component = test_func.component
+    assert not component.input_slots
+    assert not component.available_options
+
+    assert "param1" in component.output_slots
+    param1: SlotDefinition = component.output_slots["param1"]
+    assert isinstance(param1, SlotDefinition)
+    assert param1.name == "param1"
+    assert param1.type == SlotDefinition.type.OBJECT
+    assert param1.required is True
+    assert param1.multiple is True
+    assert param1.description == "A description"
     assert param1.description == ""
 
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from inspect import Parameter
+from types import GenericAlias
 from typing import (
     Any,
     Callable,
@@ -269,14 +270,14 @@ class Component:
 
     def _validate_outputs(self, datums: dict[str, Datum]):
 
-        def extra_validation(name, value, definition):
+        def extra_validation(name, value: Datum, definition):
+            if isinstance(value, UnspecifiedDatum):
+                value = value.promote(definition.type)
+            if definition.multiple and not isinstance(value, DatumFactory):
+                    value = DatumFactory(value.get_definition())
             if value.io_type != definition.type:
                 raise ValueError(
                     f"Output '{name}' is of type '{value.io_type}' but should be '{definition.type}'."
-                )
-            if definition.multiple and not isinstance(value, DatumFactory):
-                raise ValueError(
-                    f"Output '{name}' is marked as multiple but is not a DatumFactory."
                 )
             return value
 
@@ -319,7 +320,7 @@ def get_real_type(param) -> (type, tuple):
     if isinstance(param, _AnnotatedAlias):
         new_metadata, param_type = get_real_type(param.__origin__)
         return metadata + new_metadata, param_type
-    elif isinstance(param, TypeAliasType):
+    elif isinstance(param, TypeAliasType) or isinstance(param, GenericAlias):
         return get_real_type(param.__value__)
     return metadata, param
 

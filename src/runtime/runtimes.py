@@ -60,7 +60,7 @@ class Runtime:
             return [self._get_datum(datum) for datum in datum_definition]
 
         if not datum_definition.hash in self.datum_cache:
-            self.datum_cache[datum_definition.hash] = Datum.datum_factory(
+            self.datum_cache[datum_definition.hash] = Datum.from_definition(
                 datum_definition
             )
 
@@ -80,6 +80,6 @@ class Runtime:
     def commit_datums(self, datums: list[Datum]):
         for datum in datums:
             if isinstance(datum, DatumFactory):
-                self.commit_datums(datum.generated_datums)
+                self.commit_datums(datum.get_generated_datums())
             else:
                 self.communication_backend.commit_datum(datum.get_definition())
