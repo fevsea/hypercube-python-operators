@@ -1,5 +1,6 @@
 from typing import Annotated
 
+import pytest
 from annotated_types import Gt, Lt
 from typing_extensions import Doc
 
@@ -10,7 +11,14 @@ from runtime.component_definition import (
     OptionDefinition,
 )
 from runtime.context import Context
-from runtime.persistance import FolderDatum, FolderDatumInput, FolderDatumOutput, ObjectDatum, DatumFactoryOutput
+from runtime.persistance import (
+    FolderDatum,
+    FolderDatumInput,
+    FolderDatumOutput,
+    ObjectDatum,
+    DatumFactoryOutput,
+    DatumFactory,
+)
 
 
 def test_command_component_metadata():
@@ -110,7 +118,7 @@ def test_command_component_output():
     assert param1.description == ""
 
 
-def test_command_component_multiple_output():
+def test_command_component_multiple_output_alias():
     @command_component(
         name="test_component",
         version="1.0",
@@ -134,7 +142,32 @@ def test_command_component_multiple_output():
     assert param1.required is True
     assert param1.multiple is True
     assert param1.description == "A description"
-    assert param1.description == ""
+
+
+def test_command_component_multiple_output():
+    @command_component(
+        name="test_component",
+        version="1.0",
+        description="A test command component",
+        labels=["1.0"],
+    )
+    def test_func(
+        param2: DatumFactory[ObjectDatum],
+    ):
+        pass
+
+    component: Component = test_func.component
+    assert not component.input_slots
+    assert not component.available_options
+
+    assert "param2" in component.output_slots
+    param2: SlotDefinition = component.output_slots["param2"]
+    assert isinstance(param2, SlotDefinition)
+    assert param2.name == "param2"
+    assert param2.type == SlotDefinition.type.OBJECT
+    assert param2.required is True
+    assert param2.multiple is True
+    assert param2.description == ""
 
 
 def test_command_component_no_context():

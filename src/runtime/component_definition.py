@@ -1,18 +1,17 @@
 import functools
 import inspect
 import re
+import typing
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from inspect import Parameter
-from types import GenericAlias
+from inspect import Parameter, isclass
 from typing import (
     Any,
     Callable,
     Type,
     Iterable,
-    TypeAliasType,
-    _AnnotatedAlias,
+    get_args,
 )
 
 from pydantic import BaseModel, Field
@@ -274,7 +273,7 @@ class Component:
             if isinstance(value, UnspecifiedDatum):
                 value = value.promote(definition.type)
             if definition.multiple and not isinstance(value, DatumFactory):
-                    value = DatumFactory(value.get_definition())
+                value = DatumFactory(value.get_definition())
             if value.io_type != definition.type:
                 raise ValueError(
                     f"Output '{name}' is of type '{value.io_type}' but should be '{definition.type}'."
@@ -317,11 +316,23 @@ def get_real_type(param) -> (type, tuple):
     metadata = tuple()
     if hasattr(param, "__metadata__"):
         metadata = param.__metadata__ or tuple()
-    if isinstance(param, _AnnotatedAlias):
+    if isinstance(param, typing._AnnotatedAlias):
         new_metadata, param_type = get_real_type(param.__origin__)
         return metadata + new_metadata, param_type
-    elif isinstance(param, TypeAliasType) or isinstance(param, GenericAlias):
+    elif isinstance(param, typing.TypeAliasType):
         return get_real_type(param.__value__)
+    elif isinstance(param, typing.GenericAlias):
+        for item in get_args(param):
+            if isclass(item) and issubclass(item, Datum):
+                metadata += (item,)
+        new_metadata, param_type = get_real_type(param.__origin__)
+        return metadata + new_metadata, param_type
+    elif isinstance(param, typing._GenericAlias):
+        for item in get_args(param):
+            if isclass(item) and issubclass(item, Datum):
+                metadata += (item,)
+        new_metadata, param_type = get_real_type(param.__origin__)
+        return metadata + new_metadata, param_type
     return metadata, param
 
 
@@ -334,6 +345,7 @@ def decode_param(param_name: str, param: Parameter, annotation) -> dict[str, Any
         "type": annotation_type,
         "name": param_name,
         "required": param.default == param.empty,
+        "multiple": False,
     }
 
     if not decoded["required"]:
@@ -369,6 +381,13 @@ def decode_param(param_name: str, param: Parameter, annotation) -> dict[str, Any
             decoded["max"] = item.le
         if hasattr(item, "documentation"):
             decoded["description"] = item.documentation
+        if (
+            issubclass(annotation_type, DatumFactory)
+            and isclass(item)
+            and issubclass(item, Datum)
+        ):
+            decoded["type"] = item
+            decoded["multiple"] = True
 
     return decoded
 
@@ -400,8 +419,9 @@ def command_component(
         }
 
         # Extract the signature and annotations of the function
+
         signature = inspect.signature(func)
-        annotations = func.__annotations__
+        annotations = typing.get_type_hints(func, include_extras=True)
 
         # Parse the function arguments using its annotations
         for param_name, param in signature.parameters.items():
@@ -424,7 +444,7 @@ def command_component(
                         name=decoded_param["name"],
                         description=decoded_param.get("description", ""),
                         required=decoded_param["required"],
-                        multiple=False,
+                        multiple=decoded_param.get("multiple", False),
                         type=decoded_param["type"].io_type,
                     )
             elif decoded_param["type"] == Context:
