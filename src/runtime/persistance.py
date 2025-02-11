@@ -271,7 +271,7 @@ class ObjectDatum(FileDatum):
         self._committed = True
 
 
-type DatumFactoryOutput[T: Datum] = Annotated[DatumFactory[T: Datum], "output"]
+type DatumFactoryOutput[T: Datum] = Annotated[DatumFactory[T], "output"]
 class DatumFactory[T: Datum](Datum):
     """Special type of datums that allow for the creation of multiple datums.
 
