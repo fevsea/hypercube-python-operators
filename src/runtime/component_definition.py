@@ -149,6 +149,16 @@ class OptionDefinition:
 class Component:
     """Holds a runnable component."""
 
+    @classmethod
+    def from_decorated(cls, decorated_function: Callable) -> "Component":
+        """Extract the component from a decorated function.
+
+        Allows for a more idiomatic way to access the generatedfield.
+        """
+        if not hasattr(decorated_function, "component"):
+            raise ValueError(f"This only work on functions decorated with @command_component.")
+        return decorated_function.component
+
     def __init__(
         self,
         runnable: Callable,
@@ -310,7 +320,12 @@ class Option:
 
 
 def get_real_type(param) -> (type, tuple):
-    """Navigate the possibly nested hierarchy of Aliasses and annotations"""
+    """Navigate the possibly nested hierarchy of aliases, annotations and generics.
+
+    This is hold together by hopes and dreams.
+    It's based on new python features like type (keyword) aliases and generics, witch may explain the lack
+    of a clean and elegant solution on the tooling space and its documentation.
+    """
     if param is None:
         return tuple(), None
     metadata = tuple()

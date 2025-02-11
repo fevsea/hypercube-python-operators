@@ -1,4 +1,3 @@
-import abc
 import json
 import pickle
 import tomllib
@@ -190,7 +189,7 @@ class DataFrameDatum(FileDatum):
             self._df = pd.read_parquet(self.open_binary())
         return self._df
 
-    def set_df(self, df):
+    def set_df(self, df) -> "DataFrameDatum":
         if self._committed or self._df is not None:
             raise RuntimeError("Cannot modify data of an already committed datum.")
         self._df = df
@@ -247,7 +246,7 @@ class ObjectDatum(FileDatum):
         """Remove the object from memory."""
         self._object = None
 
-    def set_object(self, data):
+    def set_object(self, data) -> "ObjectDatum":
         if self._committed:
             raise RuntimeError("Cannot modify data of an already committed datum.")
         self._object = data

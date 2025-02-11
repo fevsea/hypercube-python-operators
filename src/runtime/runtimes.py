@@ -1,7 +1,4 @@
 import logging
-from functools import partial
-
-from pydantic import BaseModel, Field
 
 from runtime.catalog_base import Catalog
 from runtime.communication import CommunicationBackend
@@ -63,7 +60,7 @@ class Runtime:
             return [self._get_datum(datum) for datum in datum_definition]
 
         if datum_definition.hash is None:
-            return Datum.datum_factory(datum_definition)
+            return Datum.from_definition(datum_definition)
 
         if not datum_definition.hash in self.datum_cache:
             self.datum_cache[datum_definition.hash] = Datum.from_definition(

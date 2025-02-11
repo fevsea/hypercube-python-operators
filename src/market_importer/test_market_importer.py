@@ -1,14 +1,14 @@
-from market_importer.market_importer import MarketImporter
+import pytest
+
+from runtime.component_definition import Component
+from .market_importer import market_importer
 
 
-def test_success():
-    """Pytest success"""
-    assert True
+@pytest.fixture
+def component() -> Component:
+    return Component.from_decorated(market_importer)
 
-
-def test_instantiation():
+def test_instantiation(component):
     """Test instantiation of market_importer"""
-    options = MarketImporter.Options()
-
-    market_importer = MarketImporter(tuple(), options)
-    assert market_importer is not None
+    assert component is not None
+    assert component.name == "market_importer"
