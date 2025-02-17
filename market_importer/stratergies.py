@@ -2,10 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Generator
 
 import pandas as pd
-
-from runtime.enums import is_valid_currency_pair
-
-DataframeSlot = str
+from hypercube.runtime.enums import is_valid_currency_pair
+from hypercube.runtime.persistance import DataFrameDatum, DatumFactory
 
 
 def is_forex(literal: str, dictionary: set[str]) -> bool:
@@ -19,18 +17,19 @@ def is_forex(literal: str, dictionary: set[str]) -> bool:
 
 
 class ImportStrategy(ABC):
-    def __init__(self, base):
+    def __init__(self, base, datum_factory: DatumFactory[DataFrameDatum]):
         self.base = base
+        self.datum_factory = datum_factory
 
     @abstractmethod
-    def collect_iter(self) -> Generator[DataframeSlot, None, None]:
-        pass
+    def collect_iter(self) -> Generator[DataFrameDatum, None, None]:
+        yield from ()
 
 
 class MultipleFolderImporter(ImportStrategy):
     """Imports datasets from a list of folders."""
 
-    def collect_iter(self) -> Generator[DataframeSlot, None, None]:
+    def collect_iter(self) -> Generator[DataFrameDatum, None, None]:
         pass
 
 
@@ -40,7 +39,7 @@ class MultipleFilesImporter(ImportStrategy):
     def __init__(self, base):
         super().__init__(base)
 
-    def collect_iter(self) -> Generator[DataframeSlot, None, None]:
+    def collect_iter(self) -> Generator[DataFrameDatum, None, None]:
         for file in self.base:
             file_import = SingleFileImporter(file)
             for dfs in file_import.collect_iter():
@@ -50,7 +49,7 @@ class MultipleFilesImporter(ImportStrategy):
 class SingleFileImporter(ImportStrategy):
     """Import a single file."""
 
-    def collect_iter(self) -> Generator[DataframeSlot, None, None]:
+    def collect_iter(self) -> Generator[DataFrameDatum, None, None]:
         symbol = self.base.stem.upper()
 
         metadata = {"symbol": symbol}
@@ -62,7 +61,7 @@ class SingleFileImporter(ImportStrategy):
 
         if self.base.suffix == ".parquet":
             df = pd.read_parquet(self.base)
-            yield DataframeSlot(df, metadata)
+            yield DataFrameDatum(df, metadata)
 
 
 class FolderImporter(ImportStrategy):

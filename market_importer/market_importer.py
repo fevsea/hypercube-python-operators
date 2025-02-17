@@ -1,17 +1,20 @@
 from pathlib import Path
 
-from market_importer.stratergies import (
+from hypercube.common.utils.project_logger import get_project_logger
+from hypercube.runtime.component_definition import (
+    ComponentTags, command_component,
+)
+from hypercube.runtime.context import Context
+from hypercube.runtime.enums import is_valid_currency_pair
+from hypercube.runtime.persistance import FolderDatumInput, DatumFactoryOutput, DataFrameDatum
+
+from .stratergies import (
     ImportStrategy,
     MultipleFolderImporter,
     MultipleFilesImporter,
 )
-from runtime.component_definition import (
-    ComponentTags, command_component,
-)
-from runtime.context import Context
-from runtime.enums import is_valid_currency_pair
-from runtime.persistance import FolderDatumInput, DatumFactoryOutput, DataFrameDatum
 
+logger = get_project_logger(__name__)
 
 @command_component(
     name="market_importer",
@@ -20,16 +23,14 @@ from runtime.persistance import FolderDatumInput, DatumFactoryOutput, DataFrameD
     labels={ComponentTags.IMPORTER, ComponentTags.TIMESERIES},
 )
 def market_importer(context: Context, raw: FolderDatumInput, datum_factory: DatumFactoryOutput[DataFrameDatum]):
-    logger = context.get_logger()
     root_folder_path: Path = raw.get_path()
 
-    stratergy: ImportStrategy = determine_root_stratergy(root_folder_path, logger)
+    stratergy: ImportStrategy = determine_root_stratergy(root_folder_path)
 
     for df in stratergy.collect_iter():
-        characterize_data(dfs)
         datum_factory.create_datum().set_df(df).clear()
 
-def determine_root_stratergy(root_folder_path: Path, logger):
+def determine_root_stratergy(root_folder_path: Path):
     """Inspect the folder to determine how many individual datasets there are.
 
     The scan is not recursive to limit simplify the logic. One import job should only have one type of data,

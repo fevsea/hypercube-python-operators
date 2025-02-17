@@ -22,11 +22,18 @@ dev = [
     "bandit>=1.7.8,<2",
     "black>=24,<25",
     "setuptools>=75.8.0",
+    "pytest-datadir"
 ]
 
-[tool.hatch.build.targets.wheel]
-      packages = ["src"]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    # note the use of single quote below to denote "raw" strings in TOML
+    'ignore:.*U.*mode is deprecated:DeprecationWarning'
+]
+addopts = [
+    "--import-mode=importlib",
+    "--doctest-modules"
+]
+doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
